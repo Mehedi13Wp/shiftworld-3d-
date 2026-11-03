@@ -37,6 +37,7 @@ var car_paint := Color(0.82, 0.025, 0.035)
 const SUPERCAR_MODEL_PATH := "res://assets/vehicles/red_supercar.glb"
 const TREE_MODEL_PATH := "res://assets/nature/tree_detailed.glb"
 const OAK_MODEL_PATH := "res://assets/nature/tree_oak.glb"
+const ROAD_TEXTURE_PATH := "res://assets/roads/asphalt.jpg"
 var traffic_colors := [Color(0.64, 0.07, 0.08), Color(0.12, 0.23, 0.35), Color(0.83, 0.84, 0.85), Color(0.14, 0.16, 0.19)]
 
 func _ready() -> void:
@@ -125,7 +126,15 @@ func _create_environment() -> void:
 	add_child(sun)
 
 	_box(self, Vector3(0, -0.58, -145), Vector3(100, 0.14, ROAD_LENGTH), Color(0.21, 0.34, 0.19))
-	_box(self, Vector3(0, -0.37, -145), Vector3(16, 0.48, ROAD_LENGTH), Color(0.11, 0.13, 0.16))
+	var asphalt := _box(self, Vector3(0, -0.37, -145), Vector3(16, 0.48, ROAD_LENGTH), Color(0.11, 0.13, 0.16))
+	if ResourceLoader.exists(ROAD_TEXTURE_PATH):
+		var tex := load(ROAD_TEXTURE_PATH) as Texture2D
+		if tex != null:
+			var road_mat := StandardMaterial3D.new()
+			road_mat.albedo_texture = tex
+			road_mat.uv1_scale = Vector3(3.0, 65.0, 1.0)
+			road_mat.roughness = 0.96
+			asphalt.material_override = road_mat
 	for side in [-1.0, 1.0]:
 		_box(self, Vector3(side * 7.85, -0.08, -145), Vector3(0.18, 0.04, ROAD_LENGTH), Color(0.95, 0.94, 0.83))
 		_box(self, Vector3(side * 8.4, -0.02, -145), Vector3(0.28, 0.35, ROAD_LENGTH), Color(0.45, 0.48, 0.49))
@@ -247,6 +256,8 @@ func _create_car() -> void:
 				car.add_child(model)
 				# Asset body: tuned after actual GLB import; no procedural car overlays.
 				model.rotation.y = PI
+				# Repaint body panels red while preserving glass, rubber and lights.
+				_repaint_supercar(model)
 			else:
 				_create_supercar_preview()
 		else:
@@ -258,6 +269,28 @@ func _create_car() -> void:
 	camera.rotation_degrees.x = -10.0
 	camera.current = true
 	add_child(camera)
+
+func _repaint_supercar(root: Node) -> void:
+	for child in root.get_children():
+		if child is MeshInstance3D:
+			var mesh_node := child as MeshInstance3D
+			if mesh_node.mesh != null:
+				for surface in range(mesh_node.mesh.get_surface_count()):
+					var original := mesh_node.mesh.surface_get_material(surface) as StandardMaterial3D
+					if original == null:
+						continue
+					var c := original.albedo_color
+					# Keep transparent windows and dark tires untouched.
+					if original.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
+						continue
+					if c.v < 0.22 or c.s < 0.12:
+						continue
+					var paint := original.duplicate() as StandardMaterial3D
+					paint.albedo_color = Color(0.82, 0.018, 0.028, c.a)
+					paint.metallic = 0.48
+					paint.roughness = 0.24
+					mesh_node.set_surface_override_material(surface, paint)
+		_repaint_supercar(child)
 
 func _create_supercar_preview() -> void:
 	# Temporary low-poly preview; NOT the final licensed photorealistic GLB.
