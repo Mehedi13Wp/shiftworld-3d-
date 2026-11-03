@@ -127,14 +127,28 @@ func _create_environment() -> void:
 
 	_box(self, Vector3(0, -0.58, -145), Vector3(100, 0.14, ROAD_LENGTH), Color(0.21, 0.34, 0.19))
 	var asphalt := _box(self, Vector3(0, -0.37, -145), Vector3(16, 0.48, ROAD_LENGTH), Color(0.11, 0.13, 0.16))
+	var road_mat := StandardMaterial3D.new()
+	var road_noise := FastNoiseLite.new()
+	road_noise.seed = 47119
+	road_noise.frequency = 0.11
+	road_noise.fractal_octaves = 3
+	var asphalt_texture := NoiseTexture2D.new()
+	asphalt_texture.width = 512
+	asphalt_texture.height = 512
+	asphalt_texture.seamless = true
+	asphalt_texture.noise = road_noise
+	var road_gradient := Gradient.new()
+	road_gradient.set_color(0, Color(0.085, 0.091, 0.102))
+	road_gradient.set_color(1, Color(0.19, 0.20, 0.21))
+	asphalt_texture.color_ramp = road_gradient
+	road_mat.albedo_texture = asphalt_texture
 	if ResourceLoader.exists(ROAD_TEXTURE_PATH):
-		var tex := load(ROAD_TEXTURE_PATH) as Texture2D
-		if tex != null:
-			var road_mat := StandardMaterial3D.new()
-			road_mat.albedo_texture = tex
-			road_mat.uv1_scale = Vector3(3.0, 65.0, 1.0)
-			road_mat.roughness = 0.96
-			asphalt.material_override = road_mat
+		var external_tex := load(ROAD_TEXTURE_PATH) as Texture2D
+		if external_tex != null:
+			road_mat.albedo_texture = external_tex
+	road_mat.uv1_scale = Vector3(3.0, 65.0, 1.0)
+	road_mat.roughness = 0.95
+	asphalt.material_override = road_mat
 	for side in [-1.0, 1.0]:
 		_box(self, Vector3(side * 7.85, -0.08, -145), Vector3(0.18, 0.04, ROAD_LENGTH), Color(0.95, 0.94, 0.83))
 		_box(self, Vector3(side * 8.4, -0.02, -145), Vector3(0.28, 0.35, ROAD_LENGTH), Color(0.45, 0.48, 0.49))
@@ -286,6 +300,7 @@ func _repaint_supercar(root: Node) -> void:
 					if c.v < 0.22 or c.s < 0.12:
 						continue
 					var paint := original.duplicate() as StandardMaterial3D
+					paint.albedo_texture = null
 					paint.albedo_color = Color(0.82, 0.018, 0.028, c.a)
 					paint.metallic = 0.48
 					paint.roughness = 0.24
