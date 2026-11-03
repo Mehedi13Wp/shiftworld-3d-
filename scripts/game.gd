@@ -241,7 +241,7 @@ func _tone_stream(frequency: float, duration: float, volume: float) -> AudioStre
 	data.resize(frames * 2)
 	for i in range(frames):
 		var time := float(i) / float(rate)
-		var fade := min(1.0, float(i) / 300.0, float(frames - i) / 450.0)
+		var fade: float = minf(1.0, minf(float(i) / 300.0, float(frames - i) / 450.0))
 		var pulse := sin(TAU * frequency * time)
 		var sample := int(clampf(pulse * fade * volume, -1.0, 1.0) * 32767.0)
 		if sample < 0:
@@ -267,7 +267,7 @@ func _create_audio() -> void:
 		var t := float(i) / float(rate)
 		var beat := int(t * 4.0)
 		var local_beat := fmod(t * 4.0, 1.0)
-		var note := melody[beat % melody.size()]
+		var note: float = melody[beat % melody.size()]
 		var lead := sin(TAU * note * t) * exp(-local_beat * 4.0) * 0.12
 		var bass := sin(TAU * (55.0 if beat % 4 == 0 else 82.41) * t) * exp(-local_beat * 9.0) * 0.16
 		var sample := int(clampf(lead + bass, -1.0, 1.0) * 32767.0)
@@ -365,7 +365,7 @@ func _create_ui() -> void:
 func _process(delta: float) -> void:
 	if crashed or not game_started:
 		return
-	var target_speed := [11.0, 16.0, 23.0][difficulty]
+	var target_speed: float = [11.0, 16.0, 23.0][difficulty]
 	if accelerating:
 		target_speed = [19.0, 27.0, 36.0][difficulty]
 	if braking:
