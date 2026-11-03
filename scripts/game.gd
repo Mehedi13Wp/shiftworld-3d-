@@ -20,6 +20,7 @@ var obstacles: Array[Node3D] = []
 var wheels: Array[Node3D] = []
 var lane_marks: Array[Node3D] = []
 var roadside: Array[Node3D] = []
+var landmarks: Array[Node3D] = []
 var score_label: Label
 var status_label: Label
 
@@ -28,6 +29,7 @@ func _ready() -> void:
 	_create_car()
 	_create_ui()
 	_spawn_obstacles()
+	_create_service_area()
 
 func _material(color: Color) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
@@ -130,6 +132,54 @@ func _create_environment() -> void:
 			_tree(segment, side * (11.2 + offset), big, int(i / 4 + (0 if side < 0.0 else 2)) % 4)
 		roadside.append(segment)
 
+func _sign(parent: Node3D, pos: Vector3, size: Vector3, color: Color) -> void:
+	_box(parent, pos, size, color)
+
+func _building(parent: Node3D, x: float, z: float, width: float, depth: float, height: float, wall: Color, roof: Color) -> void:
+	_box(parent, Vector3(x, height * 0.5 - 0.38, z), Vector3(width, height, depth), wall)
+	_box(parent, Vector3(x, height - 0.30, z), Vector3(width + 0.5, 0.32, depth + 0.5), roof)
+	# Windows and entrance face the road.
+	var front := z + depth * 0.5 + 0.025
+	_box(parent, Vector3(x, 0.85, front), Vector3(1.15, 1.7, 0.07), Color(0.08, 0.15, 0.23))
+	for side in [-1.0, 1.0]:
+		_box(parent, Vector3(x + side * width * 0.30, height * 0.58, front), Vector3(0.85, 0.8, 0.07), Color(0.25, 0.65, 0.76))
+
+func _create_service_area() -> void:
+	# A roadside town/rest-stop vignette. It scrolls past the camera for now.
+	# In the next milestone it becomes a fixed, drivable destination.
+	var stop := Node3D.new()
+	add_child(stop)
+	stop.position.z = -85.0
+	landmarks.append(stop)
+
+	# Right-side parking plaza and marked parking bays.
+	_box(stop, Vector3(19.5, -0.27, 0), Vector3(21.0, 0.16, 45.0), Color(0.27, 0.29, 0.30))
+	for i in range(5):
+		var bay_z := -15.0 + float(i) * 7.0
+		_box(stop, Vector3(11.0, -0.16, bay_z), Vector3(5.0, 0.025, 0.12), Color(0.95, 0.93, 0.79))
+		_box(stop, Vector3(15.5, -0.16, bay_z), Vector3(0.12, 0.025, 6.7), Color(0.95, 0.93, 0.79))
+	# Low-cost town architecture and storefronts.
+	_building(stop, 24.0, -12.0, 8.0, 7.0, 4.8, Color(0.88, 0.78, 0.58), Color(0.55, 0.22, 0.15))
+	_building(stop, 24.0, 1.0, 9.0, 8.0, 6.5, Color(0.85, 0.90, 0.91), Color(0.16, 0.48, 0.61))
+	_building(stop, 24.0, 15.0, 8.0, 7.0, 4.4, Color(0.83, 0.61, 0.49), Color(0.38, 0.28, 0.49))
+	# Hospital cross: white sign with a red cross.
+	_sign(stop, Vector3(24.0, 5.6, 5.13), Vector3(2.1, 1.6, 0.12), Color.WHITE)
+	_sign(stop, Vector3(24.0, 5.6, 5.21), Vector3(0.38, 1.28, 0.06), Color(0.92, 0.12, 0.13))
+	_sign(stop, Vector3(24.0, 5.6, 5.25), Vector3(1.22, 0.34, 0.06), Color(0.92, 0.12, 0.13))
+	# Service station canopy and columns.
+	_box(stop, Vector3(12.5, 3.1, 12.0), Vector3(7.0, 0.4, 6.0), Color(0.18, 0.51, 0.68))
+	for x in [9.7, 15.3]:
+		_cylinder(stop, Vector3(x, 1.35, 12.0), 2.8, 0.16, Color(0.88, 0.90, 0.91))
+	# Rest-area sign visible from the road.
+	_cylinder(stop, Vector3(9.0, 2.1, -17.0), 4.2, 0.14, Color(0.76, 0.78, 0.80))
+	_sign(stop, Vector3(9.0, 4.2, -17.0), Vector3(3.4, 1.3, 0.22), Color(0.06, 0.47, 0.33))
+	# Roadside decorative flowering trees.
+	for i in range(4):
+		var planter := Node3D.new()
+		stop.add_child(planter)
+		planter.position.z = -18.0 + float(i) * 11.0
+		_tree(planter, 34.0, i % 2 == 0, 3 if i % 2 == 0 else 2)
+
 func _create_car() -> void:
 	car = Node3D.new()
 	add_child(car)
@@ -228,6 +278,10 @@ func _process(delta: float) -> void:
 		segment.position.z += speed * delta
 		if segment.position.z > 14.0:
 			segment.position.z -= 320.0
+	for landmark in landmarks:
+		landmark.position.z += speed * delta
+		if landmark.position.z > 75.0:
+			landmark.position.z -= 320.0
 	for obstacle in obstacles:
 		obstacle.position.z += speed * delta
 		if obstacle.position.z > 14.0:
