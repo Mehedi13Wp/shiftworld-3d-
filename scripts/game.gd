@@ -287,10 +287,15 @@ func _create_audio() -> void:
 	loop.data = data
 	loop.loop_mode = AudioStreamWAV.LOOP_FORWARD
 	loop.loop_end = frames
+	loop.loop_begin = 0
 	music_player = AudioStreamPlayer.new()
 	music_player.stream = loop
-	music_player.volume_db = -1.0
+	music_player.volume_db = 2.0
 	add_child(music_player)
+	music_player.finished.connect(func():
+		if music_enabled and game_started and not crashed:
+			music_player.play()
+	)
 	effect_player = AudioStreamPlayer.new()
 	effect_player.stream = _tone_stream(110.0, 0.48, 0.32)
 	add_child(effect_player)
@@ -300,7 +305,7 @@ func _choose_mode(mode: int) -> void:
 	game_started = true
 	menu_panel.visible = false
 	speed = 0.0
-	if music_enabled:
+	if music_enabled and is_instance_valid(music_player):
 		music_player.play()
 
 func _create_ui() -> void:
