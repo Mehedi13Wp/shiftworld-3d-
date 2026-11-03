@@ -35,6 +35,8 @@ var sound_button: Button
 var menu_panel: PanelContainer
 var car_paint := Color(0.82, 0.025, 0.035)
 const SUPERCAR_MODEL_PATH := "res://assets/vehicles/red_supercar.glb"
+const TREE_MODEL_PATH := "res://assets/nature/tree_detailed.glb"
+const OAK_MODEL_PATH := "res://assets/nature/tree_oak.glb"
 var traffic_colors := [Color(0.64, 0.07, 0.08), Color(0.12, 0.23, 0.35), Color(0.83, 0.84, 0.85), Color(0.14, 0.16, 0.19)]
 
 func _ready() -> void:
@@ -88,26 +90,27 @@ func _foliage(parent: Node3D, pos: Vector3, radius: float, color: Color) -> void
 	parent.add_child(item)
 
 func _tree(parent: Node3D, x: float, big: bool, kind: int) -> void:
+	var path := OAK_MODEL_PATH if kind % 3 == 0 else TREE_MODEL_PATH
+	if ResourceLoader.exists(path):
+		var packed := load(path) as PackedScene
+		if packed != null:
+			var model := packed.instantiate() as Node3D
+			if model != null:
+				parent.add_child(model)
+				model.position = Vector3(x, -0.38, 0)
+				model.scale = Vector3.ONE * (1.9 if big else 1.25)
+				model.rotation.y = float(kind) * 0.71
+				return
+	# Fallback only if nature assets have not yet been downloaded.
 	var trunk_height := 3.2 if big else 1.5
-	var crown_radius := 2.4 if big else 0.85
-	_cylinder(parent, Vector3(x, trunk_height * 0.5 - 0.2, 0), trunk_height, 0.35 if big else 0.13, Color(0.33, 0.21, 0.12))
-	var crown_color := Color(0.12, 0.37, 0.16)
-	if kind == 1:
-		crown_color = Color(0.08, 0.27, 0.20)
-	elif kind == 2:
-		crown_color = Color(0.24, 0.45, 0.14)
-	elif kind == 3:
-		crown_color = Color(0.65, 0.24, 0.45)
-	_foliage(parent, Vector3(x, trunk_height + crown_radius * 0.38 - 0.2, 0), crown_radius, crown_color)
-	if big:
-		_foliage(parent, Vector3(x - 0.9, trunk_height + 0.35, 0.4), crown_radius * 0.67, crown_color.lightened(0.08))
-		_foliage(parent, Vector3(x + 0.9, trunk_height + 0.35, -0.3), crown_radius * 0.65, crown_color.darkened(0.06))
+	_cylinder(parent, Vector3(x, trunk_height * 0.5 - 0.2, 0), trunk_height, 0.28, Color(0.33, 0.21, 0.12))
+	_foliage(parent, Vector3(x, trunk_height + 0.5, 0), 1.8 if big else 0.9, Color(0.12, 0.37, 0.16))
 
 func _create_environment() -> void:
 	var world := WorldEnvironment.new()
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.52, 0.75, 0.95)
+	env.background_color = Color(0.62, 0.79, 0.94)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color.WHITE
 	env.ambient_light_energy = 0.85
@@ -239,8 +242,13 @@ func _create_car() -> void:
 	if ResourceLoader.exists(SUPERCAR_MODEL_PATH):
 		var scene := load(SUPERCAR_MODEL_PATH) as PackedScene
 		if scene != null:
-			var model := scene.instantiate()
-			car.add_child(model)
+			var model := scene.instantiate() as Node3D
+			if model != null:
+				car.add_child(model)
+				# Asset body: tuned after actual GLB import; no procedural car overlays.
+				model.rotation.y = PI
+			else:
+				_create_supercar_preview()
 		else:
 			_create_supercar_preview()
 	else:
