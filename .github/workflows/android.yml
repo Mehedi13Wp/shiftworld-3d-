@@ -72,17 +72,16 @@ jobs:
         run: |
           set -euo pipefail
           godot --headless --editor --path . --import
-          cat > /tmp/configure_godot.gd <<'SCRIPT'
-          extends EditorScript
-          func _run() -> void:
-              var settings = get_editor_interface().get_editor_settings()
-              settings.set_setting("export/android/android_sdk_path", OS.get_environment("ANDROID_HOME"))
-              settings.set_setting("export/android/debug_keystore", OS.get_environment("HOME") + "/.android/debug.keystore")
-              settings.set_setting("export/android/debug_keystore_user", "androiddebugkey")
-              settings.set_setting("export/android/debug_keystore_pass", "android")
-              settings.save()
-          SCRIPT
-          godot --headless --editor --path . --script /tmp/configure_godot.gd
+          mkdir -p "$HOME/.config/godot"
+          cat > "$HOME/.config/godot/editor_settings-4.3.tres" <<SETTINGS
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/android_sdk_path = "$ANDROID_HOME"
+          export/android/debug_keystore = "$HOME/.android/debug.keystore"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
+          SETTINGS
 
       - name: Build installable debug APK
         shell: bash
