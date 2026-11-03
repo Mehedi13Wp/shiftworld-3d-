@@ -28,6 +28,7 @@ var game_started := false
 var music_enabled := true
 var sound_enabled := true
 var music_player: AudioStreamPlayer
+var music_test_label: Label
 var effect_player: AudioStreamPlayer
 var music_button: Button
 var sound_button: Button
@@ -273,8 +274,8 @@ func _create_audio() -> void:
 		var beat := int(t * 4.0)
 		var local_beat := fmod(t * 4.0, 1.0)
 		var note: float = melody[beat % melody.size()]
-		var lead := sin(TAU * note * t) * exp(-local_beat * 4.0) * 0.12
-		var bass := sin(TAU * (55.0 if beat % 4 == 0 else 82.41) * t) * exp(-local_beat * 9.0) * 0.22
+		var lead := (sin(TAU * note * t) + 0.25 * sin(TAU * note * 2.0 * t)) * exp(-local_beat * 3.0) * 0.24
+		var bass := sin(TAU * (110.0 if beat % 4 == 0 else 164.82) * t) * exp(-local_beat * 7.0) * 0.24
 		var sample := int(clampf(lead + bass, -1.0, 1.0) * 32767.0)
 		if sample < 0:
 			sample += 65536
@@ -290,7 +291,8 @@ func _create_audio() -> void:
 	loop.loop_begin = 0
 	music_player = AudioStreamPlayer.new()
 	music_player.stream = loop
-	music_player.volume_db = 2.0
+	music_player.volume_db = 0.0
+	music_player.bus = "Master"
 	add_child(music_player)
 	music_player.finished.connect(func():
 		if music_enabled and game_started and not crashed:
@@ -307,6 +309,8 @@ func _choose_mode(mode: int) -> void:
 	speed = 0.0
 	if music_enabled and is_instance_valid(music_player):
 		music_player.play()
+		if is_instance_valid(music_test_label):
+			music_test_label.text = "MUSIC: PLAYING" if music_player.playing else "MUSIC: FAILED"
 
 func _create_ui() -> void:
 	var layer := CanvasLayer.new()
@@ -323,6 +327,11 @@ func _create_ui() -> void:
 	status_label.add_theme_font_size_override("font_size", 38)
 	ui.add_child(status_label)
 
+	music_test_label = Label.new()
+	music_test_label.position = Vector2(22, 208)
+	music_test_label.add_theme_font_size_override("font_size", 20)
+	music_test_label.text = "MUSIC: READY"
+	ui.add_child(music_test_label)
 	music_button = _button(ui, "MUSIC ON", Vector2(20, 135), Vector2(170, 65))
 	music_button.pressed.connect(func():
 		music_enabled = not music_enabled
@@ -331,6 +340,7 @@ func _create_ui() -> void:
 			music_player.play()
 		else:
 			music_player.stop()
+		music_test_label.text = "MUSIC: PLAYING" if music_player.playing else "MUSIC: OFF"
 	)
 	sound_button = _button(ui, "SOUND ON", Vector2(195, 135), Vector2(175, 65))
 	sound_button.pressed.connect(func():
