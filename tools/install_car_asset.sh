@@ -2,24 +2,15 @@
 set -euo pipefail
 cd "$HOME/shiftworld-3d-"
 mkdir -p assets/vehicles build
-archive="$HOME/shiftworld-car-kit.zip"
-url="https://kenney.nl/media/pages/assets/car-kit/1a312ec241-1775131960/kenney_car-kit.zip"
-echo "Downloading original Kenney Car Kit (CC0)..."
-curl -fL --retry 3 --connect-timeout 20 "$url" -o "$archive"
-echo "Available sports models:"
-unzip -Z1 "$archive" | grep -Ei '\.glb$' | grep -Ei 'race|sport|super|hatchback' || true
-model="$(unzip -Z1 "$archive" | grep -Ei '\.glb$' | grep -Ei 'race|sport|super|hatchback' | head -n 1 || true)"
-if [ -z "$model" ]; then
-  echo "No sports model detected. See available GLB models:"
-  unzip -Z1 "$archive" | grep -Ei '\.glb$' | head -30
-  exit 1
-fi
-echo "Installing model: $model"
-unzip -p "$archive" "$model" > assets/vehicles/red_supercar.glb
-test -s assets/vehicles/red_supercar.glb
-echo "Real 3D model installed. Importing..."
+url="https://raw.githubusercontent.com/Hidencod/tge-assets/main/packs/car-kit/race.glb"
+echo "Downloading CC0 Kenney racing car GLB from GitHub mirror..."
+curl -fL --retry 3 --connect-timeout 20 "$url" -o assets/vehicles/red_supercar.glb
+test "$(wc -c < assets/vehicles/red_supercar.glb)" -gt 10000 || { echo "Invalid GLB download"; exit 1; }
+echo "3D GLB downloaded. Importing..."
 godot --headless --editor --path . --import
 echo "Building Android APK..."
+mkdir -p build
 godot --headless --path . --export-debug "Android" build/SHIFTWORLD-DEV.apk
+test -s build/SHIFTWORLD-DEV.apk
 cp -f build/SHIFTWORLD-DEV.apk /storage/emulated/0/Download/SHIFTWORLD-DEV.apk
 echo "DONE: Downloads/SHIFTWORLD-DEV.apk"
