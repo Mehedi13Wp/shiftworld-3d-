@@ -23,11 +23,21 @@ var roadside: Array[Node3D] = []
 var landmarks: Array[Node3D] = []
 var score_label: Label
 var status_label: Label
+var difficulty := 0
+var game_started := false
+var music_enabled := true
+var sound_enabled := true
+var music_player: AudioStreamPlayer
+var effect_player: AudioStreamPlayer
+var music_button: Button
+var sound_button: Button
+var menu_panel: PanelContainer
 
 func _ready() -> void:
 	_create_environment()
 	_create_car()
 	_create_ui()
+	_create_audio()
 	_spawn_obstacles()
 	_create_service_area()
 
@@ -224,6 +234,70 @@ func _button(parent: Control, title: String, pos: Vector2, dimensions: Vector2) 
 	parent.add_child(btn)
 	return btn
 
+func _tone_stream(frequency: float, duration: float, volume: float) -> AudioStreamWAV:
+	var rate := 22050
+	var frames := int(duration * float(rate))
+	var data := PackedByteArray()
+	data.resize(frames * 2)
+	for i in range(frames):
+		var time := float(i) / float(rate)
+		var fade := min(1.0, float(i) / 300.0, float(frames - i) / 450.0)
+		var pulse := sin(TAU * frequency * time)
+		var sample := int(clampf(pulse * fade * volume, -1.0, 1.0) * 32767.0)
+		if sample < 0:
+			sample += 65536
+		data[i * 2] = sample & 255
+		data[i * 2 + 1] = (sample >> 8) & 255
+	var wav := AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = rate
+	wav.stereo = false
+	wav.data = data
+	return wav
+
+func _create_audio() -> void:
+	# Original lightweight rhythmic synthesizer loop; no copyrighted recordings.
+	var rate := 22050
+	var duration := 4.0
+	var frames := int(duration * float(rate))
+	var data := PackedByteArray()
+	data.resize(frames * 2)
+	var melody := [220.0, 261.63, 329.63, 293.66, 220.0, 329.63, 392.0, 293.66]
+	for i in range(frames):
+		var t := float(i) / float(rate)
+		var beat := int(t * 4.0)
+		var local_beat := fmod(t * 4.0, 1.0)
+		var note := melody[beat % melody.size()]
+		var lead := sin(TAU * note * t) * exp(-local_beat * 4.0) * 0.12
+		var bass := sin(TAU * (55.0 if beat % 4 == 0 else 82.41) * t) * exp(-local_beat * 9.0) * 0.16
+		var sample := int(clampf(lead + bass, -1.0, 1.0) * 32767.0)
+		if sample < 0:
+			sample += 65536
+		data[i * 2] = sample & 255
+		data[i * 2 + 1] = (sample >> 8) & 255
+	var loop := AudioStreamWAV.new()
+	loop.format = AudioStreamWAV.FORMAT_16_BITS
+	loop.mix_rate = rate
+	loop.stereo = false
+	loop.data = data
+	loop.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	loop.loop_end = frames
+	music_player = AudioStreamPlayer.new()
+	music_player.stream = loop
+	music_player.volume_db = -7.0
+	add_child(music_player)
+	effect_player = AudioStreamPlayer.new()
+	effect_player.stream = _tone_stream(110.0, 0.48, 0.32)
+	add_child(effect_player)
+
+func _choose_mode(mode: int) -> void:
+	difficulty = mode
+	game_started = true
+	menu_panel.visible = false
+	speed = [11.0, 16.0, 23.0][difficulty]
+	if music_enabled:
+		music_player.play()
+
 func _create_ui() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
@@ -238,6 +312,40 @@ func _create_ui() -> void:
 	status_label.position = Vector2(115, 310)
 	status_label.add_theme_font_size_override("font_size", 38)
 	ui.add_child(status_label)
+
+	music_button = _button(ui, "MUSIC ON", Vector2(20, 135), Vector2(170, 65))
+	music_button.pressed.connect(func():
+		music_enabled = not music_enabled
+		music_button.text = "MUSIC ON" if music_enabled else "MUSIC OFF"
+		if music_enabled and game_started and not crashed:
+			music_player.play()
+		else:
+			music_player.stop()
+	)
+	sound_button = _button(ui, "SOUND ON", Vector2(195, 135), Vector2(175, 65))
+	sound_button.pressed.connect(func():
+		sound_enabled = not sound_enabled
+		sound_button.text = "SOUND ON" if sound_enabled else "SOUND OFF"
+	)
+	menu_panel = PanelContainer.new()
+	menu_panel.position = Vector2(125, 335)
+	menu_panel.custom_minimum_size = Vector2(470, 390)
+	ui.add_child(menu_panel)
+	var menu := VBoxContainer.new()
+	menu.add_theme_constant_override("separation", 15)
+	menu_panel.add_child(menu)
+	var heading := Label.new()
+	heading.text = "SHIFTWORLD 3D\\nCHOOSE DIFFICULTY"
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	heading.add_theme_font_size_override("font_size", 29)
+	menu.add_child(heading)
+	for i in range(3):
+		var mode_button := Button.new()
+		mode_button.text = ["NORMAL", "MEDIUM", "HARD"][i]
+		mode_button.custom_minimum_size = Vector2(430, 80)
+		mode_button.add_theme_font_size_override("font_size", 27)
+		menu.add_child(mode_button)
+		mode_button.pressed.connect(_choose_mode.bind(i))
 
 	var left := _button(ui, "LEFT", Vector2(22, 1060), Vector2(150, 100))
 	left.button_down.connect(func(): steering = -1.0)
@@ -255,11 +363,11 @@ func _create_ui() -> void:
 	restart.pressed.connect(func(): get_tree().reload_current_scene())
 
 func _process(delta: float) -> void:
-	if crashed:
+	if crashed or not game_started:
 		return
-	var target_speed := CRUISE_SPEED
+	var target_speed := [11.0, 16.0, 23.0][difficulty]
 	if accelerating:
-		target_speed = MAX_SPEED
+		target_speed = [19.0, 27.0, 36.0][difficulty]
 	if braking:
 		target_speed = MIN_SPEED
 	speed = move_toward(speed, target_speed, (24.0 if braking else 9.0) * delta)
