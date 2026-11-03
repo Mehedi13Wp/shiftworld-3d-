@@ -10,7 +10,7 @@ const MIN_SPEED := 0.0
 
 var car: Node3D
 var camera: Camera3D
-var speed := CRUISE_SPEED
+var speed := 0.0
 var steering := 0.0
 var accelerating := false
 var braking := false
@@ -32,6 +32,7 @@ var effect_player: AudioStreamPlayer
 var music_button: Button
 var sound_button: Button
 var menu_panel: PanelContainer
+var car_paint := Color(0.70, 0.73, 0.77)
 
 func _ready() -> void:
 	_create_environment()
@@ -44,7 +45,7 @@ func _ready() -> void:
 func _material(color: Color) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = color
-	mat.roughness = 0.83
+	mat.roughness = 0.55
 	return mat
 
 func _box(parent: Node3D, pos: Vector3, size: Vector3, color: Color) -> MeshInstance3D:
@@ -191,37 +192,41 @@ func _create_service_area() -> void:
 		_tree(planter, 34.0, i % 2 == 0, 3 if i % 2 == 0 else 2)
 
 func _create_car() -> void:
+	# Premium silver sedan silhouette: layered hood, cabin, trim, lights and alloy wheels.
 	car = Node3D.new()
 	add_child(car)
-	car.position = Vector3(2.0, 0.65, 4.0)
-	_box(car, Vector3(0, -0.04, 0), Vector3(1.72, 0.42, 3.55), Color(0.025, 0.27, 0.88))
-	_box(car, Vector3(0, 0.24, -0.65), Vector3(1.52, 0.26, 1.4), Color(0.03, 0.33, 0.95))
-	_box(car, Vector3(0, 0.49, -0.15), Vector3(1.30, 0.48, 1.65), Color(0.065, 0.11, 0.18))
-	_box(car, Vector3(0, 0.73, -0.18), Vector3(1.18, 0.08, 1.3), Color(0.03, 0.30, 0.86))
-	_box(car, Vector3(0, 0.11, 1.55), Vector3(1.58, 0.16, 0.28), Color(0.02, 0.14, 0.4))
-	for x in [-0.57, 0.57]:
-		_box(car, Vector3(x, 0.10, -1.76), Vector3(0.35, 0.15, 0.09), Color(1.0, 0.94, 0.70))
-		_box(car, Vector3(x, 0.10, 1.79), Vector3(0.35, 0.13, 0.08), Color(0.96, 0.08, 0.07))
-	for x in [-0.91, 0.91]:
-		for z in [-1.12, 1.12]:
+	car.position = Vector3(2.0, 0.67, 4.0)
+	_box(car, Vector3(0, -0.06, 0), Vector3(1.84, 0.43, 4.15), car_paint)
+	_box(car, Vector3(0, 0.14, -1.31), Vector3(1.76, 0.19, 1.40), car_paint.lightened(0.08))
+	_box(car, Vector3(0, 0.23, 1.43), Vector3(1.75, 0.18, 1.15), car_paint)
+	_box(car, Vector3(0, 0.47, -0.16), Vector3(1.56, 0.56, 2.20), Color(0.12, 0.19, 0.25))
+	_box(car, Vector3(0, 0.78, -0.16), Vector3(1.37, 0.10, 1.64), car_paint)
+	_box(car, Vector3(0, 0.08, -2.08), Vector3(1.62, 0.13, 0.09), Color(0.13, 0.14, 0.16))
+	_box(car, Vector3(0, 0.06, 2.10), Vector3(1.60, 0.13, 0.09), Color(0.13, 0.14, 0.16))
+	for x in [-0.70, 0.70]:
+		_box(car, Vector3(x, 0.17, -2.11), Vector3(0.38, 0.16, 0.07), Color(0.97, 0.96, 0.81))
+		_box(car, Vector3(x, 0.17, 2.13), Vector3(0.40, 0.15, 0.07), Color(0.85, 0.06, 0.06))
+		_box(car, Vector3(x * 1.23, 0.45, -0.50), Vector3(0.16, 0.12, 0.28), car_paint)
+	for x in [-0.95, 0.95]:
+		for z in [-1.38, 1.38]:
 			var pivot := Node3D.new()
-			pivot.position = Vector3(x, -0.26, z)
+			pivot.position = Vector3(x, -0.31, z)
 			car.add_child(pivot)
-			var tire := _cylinder(pivot, Vector3.ZERO, 0.27, 0.39, Color(0.035, 0.04, 0.05))
+			var tire := _cylinder(pivot, Vector3.ZERO, 0.28, 0.40, Color(0.035, 0.04, 0.045))
 			tire.rotation_degrees.z = 90
+			_cylinder(pivot, Vector3(x * 0.10, 0, 0), 0.03, 0.24, Color(0.68, 0.70, 0.73)).rotation_degrees.z = 90
 			wheels.append(pivot)
-
 	camera = Camera3D.new()
-	camera.position = Vector3(2.0, 5.3, 12.5)
-	camera.rotation_degrees.x = -17
+	camera.position = Vector3(2.0, 5.4, 13.5)
+	camera.rotation_degrees.x = -16
 	camera.current = true
 	add_child(camera)
 
 func _spawn_obstacles() -> void:
-	for i in range(16):
+	for i in range(8):
 		var obstacle := Node3D.new()
 		add_child(obstacle)
-		obstacle.position = Vector3(2.0 if i % 2 == 0 else 6.0, 0.65, -18.0 - float(i) * 17.0)
+		obstacle.position = Vector3(2.0 if i % 2 == 0 else 6.0, 0.65, -85.0 - float(i) * 34.0)
 		_box(obstacle, Vector3.ZERO, Vector3(1.7, 1.3, 1.5), Color(1.0, 0.46, 0.06))
 		obstacles.append(obstacle)
 
@@ -258,7 +263,7 @@ func _tone_stream(frequency: float, duration: float, volume: float) -> AudioStre
 func _create_audio() -> void:
 	# Original lightweight rhythmic synthesizer loop; no copyrighted recordings.
 	var rate := 22050
-	var duration := 4.0
+	var duration := 2.0
 	var frames := int(duration * float(rate))
 	var data := PackedByteArray()
 	data.resize(frames * 2)
@@ -269,7 +274,7 @@ func _create_audio() -> void:
 		var local_beat := fmod(t * 4.0, 1.0)
 		var note: float = melody[beat % melody.size()]
 		var lead := sin(TAU * note * t) * exp(-local_beat * 4.0) * 0.12
-		var bass := sin(TAU * (55.0 if beat % 4 == 0 else 82.41) * t) * exp(-local_beat * 9.0) * 0.16
+		var bass := sin(TAU * (55.0 if beat % 4 == 0 else 82.41) * t) * exp(-local_beat * 9.0) * 0.22
 		var sample := int(clampf(lead + bass, -1.0, 1.0) * 32767.0)
 		if sample < 0:
 			sample += 65536
@@ -284,7 +289,7 @@ func _create_audio() -> void:
 	loop.loop_end = frames
 	music_player = AudioStreamPlayer.new()
 	music_player.stream = loop
-	music_player.volume_db = -7.0
+	music_player.volume_db = -1.0
 	add_child(music_player)
 	effect_player = AudioStreamPlayer.new()
 	effect_player.stream = _tone_stream(110.0, 0.48, 0.32)
@@ -294,7 +299,7 @@ func _choose_mode(mode: int) -> void:
 	difficulty = mode
 	game_started = true
 	menu_panel.visible = false
-	speed = [11.0, 16.0, 23.0][difficulty]
+	speed = 0.0
 	if music_enabled:
 		music_player.play()
 
@@ -335,7 +340,7 @@ func _create_ui() -> void:
 	menu.add_theme_constant_override("separation", 15)
 	menu_panel.add_child(menu)
 	var heading := Label.new()
-	heading.text = "SHIFTWORLD 3D\\nCHOOSE DIFFICULTY"
+	heading.text = "SHIFTWORLD 3D\nCHOOSE DIFFICULTY"
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	heading.add_theme_font_size_override("font_size", 29)
 	menu.add_child(heading)
@@ -365,15 +370,15 @@ func _create_ui() -> void:
 func _process(delta: float) -> void:
 	if crashed or not game_started:
 		return
-	var target_speed: float = [11.0, 16.0, 23.0][difficulty]
+	var target_speed: float = [0.0, 0.0, 0.0][difficulty]
 	if accelerating:
-		target_speed = [19.0, 27.0, 36.0][difficulty]
+		target_speed = [5.5, 9.0, 14.0][difficulty]
 	if braking:
 		target_speed = MIN_SPEED
 	speed = move_toward(speed, target_speed, (24.0 if braking else 9.0) * delta)
 	distance += speed * delta
 	# This milestone still uses scrolling scenery; full world-space driving comes next.
-	car.position.x = clamp(car.position.x + steering * (3.8 + speed * 0.13) * delta, 1.1, 6.9)
+	car.position.x = clamp(car.position.x + steering * (1.65 + speed * 0.08) * delta, 1.1, 6.9)
 	car.rotation.z = lerp(car.rotation.z, -steering * 0.09, min(delta * 6.0, 1.0))
 	camera.position.x = lerp(camera.position.x, car.position.x, min(delta * 3.0, 1.0))
 	for wheel in wheels:
@@ -393,9 +398,9 @@ func _process(delta: float) -> void:
 	for obstacle in obstacles:
 		obstacle.position.z += speed * delta
 		if obstacle.position.z > 14.0:
-			obstacle.position.z -= 272.0
+			obstacle.position.z -= 300.0
 			obstacle.position.x = 2.0 if randi() % 2 == 0 else 6.0
 		if abs(obstacle.position.z - car.position.z) < 1.8 and abs(obstacle.position.x - car.position.x) < 1.65:
 			crashed = true
 			status_label.text = "CRASH!\nTRY AGAIN"
-	score_label.text = "DISTANCE: %dm  |  SPEED: %d" % [int(distance), int(speed * 3.6)]
+	score_label.text = "DISTANCE: %dm  |  SPEED: %d km/h" % [int(distance), int(speed * 3.6)]
