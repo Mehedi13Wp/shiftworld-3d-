@@ -34,9 +34,11 @@ var music_button: Button
 var sound_button: Button
 var menu_panel: PanelContainer
 var car_paint := Color(0.70, 0.73, 0.77)
+var traffic_colors := [Color(0.64, 0.07, 0.08), Color(0.12, 0.23, 0.35), Color(0.83, 0.84, 0.85), Color(0.14, 0.16, 0.19)]
 
 func _ready() -> void:
 	_create_environment()
+	_roadside_details()
 	_create_car()
 	_create_ui()
 	_create_audio()
@@ -46,7 +48,8 @@ func _ready() -> void:
 func _material(color: Color) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = color
-	mat.roughness = 0.55
+	mat.roughness = 0.42
+	mat.metallic = 0.12
 	return mat
 
 func _box(parent: Node3D, pos: Vector3, size: Vector3, color: Color) -> MeshInstance3D:
@@ -144,6 +147,41 @@ func _create_environment() -> void:
 			_tree(segment, side * (11.2 + offset), big, int(i / 4 + (0 if side < 0.0 else 2)) % 4)
 		roadside.append(segment)
 
+func _roadside_details() -> void:
+	# Repeating crash barriers, reflectors and a distant layered mountain skyline.
+	for side in [-1.0, 1.0]:
+		_box(self, Vector3(side * 9.0, 0.23, -145.0), Vector3(0.11, 0.16, ROAD_LENGTH), Color(0.68, 0.73, 0.76))
+		for i in range(55):
+			var z := 12.0 - float(i) * 6.0
+			_box(self, Vector3(side * 9.0, -0.10, z), Vector3(0.12, 0.78, 0.13), Color(0.45, 0.49, 0.51))
+			if i % 3 == 0:
+				_box(self, Vector3(side * 8.95, 0.32, z), Vector3(0.16, 0.12, 0.22), Color(0.97, 0.69, 0.18))
+		for i in range(18):
+			var z := -float(i) * 19.0
+			var hill := MeshInstance3D.new()
+			var mesh := SphereMesh.new()
+			mesh.radius = 12.0 + float(i % 4) * 3.0
+			mesh.height = 14.0 + float(i % 5) * 2.0
+			mesh.radial_segments = 12
+			mesh.rings = 6
+			hill.mesh = mesh
+			hill.position = Vector3(side * (38.0 + float(i % 3) * 12.0), -4.0, z)
+			hill.material_override = _material(Color(0.18, 0.32, 0.25) if i % 2 == 0 else Color(0.22, 0.37, 0.27))
+			add_child(hill)
+
+func _traffic_vehicle(parent: Node3D, paint: Color) -> void:
+	# Replaces arcade orange cubes with traffic silhouettes.
+	_box(parent, Vector3(0, -0.10, 0), Vector3(1.68, 0.46, 3.65), paint)
+	_box(parent, Vector3(0, 0.28, -0.15), Vector3(1.43, 0.56, 1.85), Color(0.10, 0.16, 0.20))
+	_box(parent, Vector3(0, 0.58, -0.15), Vector3(1.32, 0.08, 1.48), paint.lightened(0.12))
+	for x in [-0.60, 0.60]:
+		_box(parent, Vector3(x, 0.02, 1.85), Vector3(0.34, 0.13, 0.07), Color(0.92, 0.09, 0.06))
+		_box(parent, Vector3(x, 0.02, -1.86), Vector3(0.34, 0.13, 0.07), Color(0.94, 0.91, 0.76))
+	for x in [-0.90, 0.90]:
+		for z in [-1.15, 1.15]:
+			var tire := _cylinder(parent, Vector3(x, -0.37, z), 0.22, 0.35, Color(0.04, 0.04, 0.05))
+			tire.rotation_degrees.z = 90
+
 func _sign(parent: Node3D, pos: Vector3, size: Vector3, color: Color) -> void:
 	_box(parent, pos, size, color)
 
@@ -227,8 +265,8 @@ func _spawn_obstacles() -> void:
 	for i in range(8):
 		var obstacle := Node3D.new()
 		add_child(obstacle)
-		obstacle.position = Vector3(2.0 if i % 2 == 0 else 6.0, 0.65, -85.0 - float(i) * 34.0)
-		_box(obstacle, Vector3.ZERO, Vector3(1.7, 1.3, 1.5), Color(1.0, 0.46, 0.06))
+		obstacle.position = Vector3(2.0 if i % 2 == 0 else 6.0, 0.75, -85.0 - float(i) * 34.0)
+		_traffic_vehicle(obstacle, traffic_colors[i % traffic_colors.size()])
 		obstacles.append(obstacle)
 
 func _button(parent: Control, title: String, pos: Vector2, dimensions: Vector2) -> Button:
@@ -394,7 +432,7 @@ func _process(delta: float) -> void:
 	distance += speed * delta
 	# This milestone still uses scrolling scenery; full world-space driving comes next.
 	car.position.x = clamp(car.position.x + steering * (1.65 + speed * 0.08) * delta, 1.1, 6.9)
-	car.rotation.z = lerp(car.rotation.z, -steering * 0.09, min(delta * 6.0, 1.0))
+	car.rotation.z = lerp(car.rotation.z, -steering * 0.045, min(delta * 6.0, 1.0))
 	camera.position.x = lerp(camera.position.x, car.position.x, min(delta * 3.0, 1.0))
 	for wheel in wheels:
 		wheel.rotate_x(speed * delta * 1.7)
@@ -415,7 +453,7 @@ func _process(delta: float) -> void:
 		if obstacle.position.z > 14.0:
 			obstacle.position.z -= 300.0
 			obstacle.position.x = 2.0 if randi() % 2 == 0 else 6.0
-		if abs(obstacle.position.z - car.position.z) < 1.8 and abs(obstacle.position.x - car.position.x) < 1.65:
+		if abs(obstacle.position.z - car.position.z) < 3.3 and abs(obstacle.position.x - car.position.x) < 1.65:
 			crashed = true
 			status_label.text = "CRASH!\nTRY AGAIN"
 	score_label.text = "DISTANCE: %dm  |  SPEED: %d km/h" % [int(distance), int(speed * 3.6)]
