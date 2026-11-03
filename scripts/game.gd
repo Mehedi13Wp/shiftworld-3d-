@@ -33,7 +33,8 @@ var effect_player: AudioStreamPlayer
 var music_button: Button
 var sound_button: Button
 var menu_panel: PanelContainer
-var car_paint := Color(0.70, 0.73, 0.77)
+var car_paint := Color(0.82, 0.025, 0.035)
+const SUPERCAR_MODEL_PATH := "res://assets/vehicles/red_supercar.glb"
 var traffic_colors := [Color(0.64, 0.07, 0.08), Color(0.12, 0.23, 0.35), Color(0.83, 0.84, 0.85), Color(0.14, 0.16, 0.19)]
 
 func _ready() -> void:
@@ -231,35 +232,48 @@ func _create_service_area() -> void:
 		_tree(planter, 34.0, i % 2 == 0, 3 if i % 2 == 0 else 2)
 
 func _create_car() -> void:
-	# Premium silver sedan silhouette: layered hood, cabin, trim, lights and alloy wheels.
 	car = Node3D.new()
 	add_child(car)
 	car.position = Vector3(2.0, 0.67, 4.0)
-	_box(car, Vector3(0, -0.06, 0), Vector3(1.84, 0.43, 4.15), car_paint)
-	_box(car, Vector3(0, 0.14, -1.31), Vector3(1.76, 0.19, 1.40), car_paint.lightened(0.08))
-	_box(car, Vector3(0, 0.23, 1.43), Vector3(1.75, 0.18, 1.15), car_paint)
-	_box(car, Vector3(0, 0.47, -0.16), Vector3(1.56, 0.56, 2.20), Color(0.12, 0.19, 0.25))
-	_box(car, Vector3(0, 0.78, -0.16), Vector3(1.37, 0.10, 1.64), car_paint)
-	_box(car, Vector3(0, 0.08, -2.08), Vector3(1.62, 0.13, 0.09), Color(0.13, 0.14, 0.16))
-	_box(car, Vector3(0, 0.06, 2.10), Vector3(1.60, 0.13, 0.09), Color(0.13, 0.14, 0.16))
-	for x in [-0.70, 0.70]:
-		_box(car, Vector3(x, 0.17, -2.11), Vector3(0.38, 0.16, 0.07), Color(0.97, 0.96, 0.81))
-		_box(car, Vector3(x, 0.17, 2.13), Vector3(0.40, 0.15, 0.07), Color(0.85, 0.06, 0.06))
-		_box(car, Vector3(x * 1.23, 0.45, -0.50), Vector3(0.16, 0.12, 0.28), car_paint)
-	for x in [-0.95, 0.95]:
-		for z in [-1.38, 1.38]:
+	# A licensed GLB can replace the procedural preview without changing driving controls.
+	if ResourceLoader.exists(SUPERCAR_MODEL_PATH):
+		var scene := load(SUPERCAR_MODEL_PATH) as PackedScene
+		if scene != null:
+			var model := scene.instantiate()
+			car.add_child(model)
+		else:
+			_create_supercar_preview()
+	else:
+		_create_supercar_preview()
+	camera = Camera3D.new()
+	camera.position = Vector3(2.0, 3.7, 12.0)
+	camera.rotation_degrees.x = -10.0
+	camera.current = true
+	add_child(camera)
+
+func _create_supercar_preview() -> void:
+	# Temporary low-poly preview; NOT the final licensed photorealistic GLB.
+	_box(car, Vector3(0, -0.17, 0), Vector3(1.96, 0.30, 4.25), car_paint)
+	_box(car, Vector3(0, -0.05, -1.38), Vector3(1.89, 0.13, 1.43), car_paint.lightened(0.06))
+	_box(car, Vector3(0, 0.19, 0.12), Vector3(1.61, 0.40, 1.85), Color(0.065, 0.085, 0.11))
+	_box(car, Vector3(0, 0.41, 0.14), Vector3(1.48, 0.09, 1.48), car_paint)
+	_box(car, Vector3(0, -0.20, -2.14), Vector3(1.67, 0.12, 0.10), Color(0.055, 0.06, 0.07))
+	_box(car, Vector3(0, -0.17, 2.14), Vector3(1.76, 0.15, 0.12), Color(0.055, 0.06, 0.07))
+	_box(car, Vector3(0, 0.13, 1.89), Vector3(1.78, 0.07, 0.32), Color(0.055, 0.06, 0.07))
+	for x in [-0.75, 0.75]:
+		_box(car, Vector3(x, -0.07, -2.15), Vector3(0.37, 0.10, 0.06), Color(0.95, 0.95, 0.83))
+		_box(car, Vector3(x, -0.07, 2.16), Vector3(0.40, 0.11, 0.06), Color(0.95, 0.05, 0.06))
+		_box(car, Vector3(x * 1.16, 0.11, -0.40), Vector3(0.12, 0.11, 0.26), car_paint)
+	for x in [-0.97, 0.97]:
+		for z in [-1.40, 1.40]:
 			var pivot := Node3D.new()
 			pivot.position = Vector3(x, -0.31, z)
 			car.add_child(pivot)
-			var tire := _cylinder(pivot, Vector3.ZERO, 0.28, 0.40, Color(0.035, 0.04, 0.045))
+			var tire := _cylinder(pivot, Vector3.ZERO, 0.30, 0.43, Color(0.028, 0.03, 0.035))
 			tire.rotation_degrees.z = 90
-			_cylinder(pivot, Vector3(x * 0.10, 0, 0), 0.03, 0.24, Color(0.68, 0.70, 0.73)).rotation_degrees.z = 90
+			var rim := _cylinder(pivot, Vector3(0.02 if x > 0 else -0.02, 0, 0), 0.04, 0.27, Color(0.25, 0.27, 0.29))
+			rim.rotation_degrees.z = 90
 			wheels.append(pivot)
-	camera = Camera3D.new()
-	camera.position = Vector3(2.0, 5.4, 13.5)
-	camera.rotation_degrees.x = -16
-	camera.current = true
-	add_child(camera)
 
 func _spawn_obstacles() -> void:
 	for i in range(8):
