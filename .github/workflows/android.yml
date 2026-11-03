@@ -65,6 +65,13 @@ jobs:
           package/unique_name="com.shiftworld.racing3d"
           package/name="SHIFTWORLD 3D"
           package/signed=true
+          architectures/arm64-v8a=true
+          architectures/armeabi-v7a=true
+          architectures/x86=false
+          architectures/x86_64=false
+          keystore/debug=""
+          keystore/debug_user="androiddebugkey"
+          keystore/debug_password="android"
           PRESET
 
       - name: Import game and configure Godot Android SDK
@@ -72,16 +79,20 @@ jobs:
         run: |
           set -euo pipefail
           godot --headless --editor --path . --import
-          mkdir -p "$HOME/.config/godot"
-          cat > "$HOME/.config/godot/editor_settings-4.3.tres" <<SETTINGS
-          [gd_resource type="EditorSettings" format=3]
+          cat > configure_export.gd <<'SCRIPT'
+          extends SceneTree
 
-          [resource]
-          export/android/android_sdk_path = "$ANDROID_HOME"
-          export/android/debug_keystore = "$HOME/.android/debug.keystore"
-          export/android/debug_keystore_user = "androiddebugkey"
-          export/android/debug_keystore_pass = "android"
-          SETTINGS
+          func _initialize() -> void:
+              var settings = EditorInterface.get_editor_settings()
+              settings.set_setting("export/android/android_sdk_path", OS.get_environment("ANDROID_HOME"))
+              settings.set_setting("export/android/debug_keystore", OS.get_environment("HOME") + "/.android/debug.keystore")
+              settings.set_setting("export/android/debug_keystore_user", "androiddebugkey")
+              settings.set_setting("export/android/debug_keystore_pass", "android")
+              settings.save()
+              quit()
+          SCRIPT
+          godot --headless --editor --path . --script res://configure_export.gd
+          rm configure_export.gd
 
       - name: Build installable debug APK
         shell: bash
