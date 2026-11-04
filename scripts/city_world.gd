@@ -136,6 +136,14 @@ func _strip(st: SurfaceTool, a: Vector2, b: Vector2, normal: Vector2, half_width
 	var off := normal * half_width
 	_quad(st, Vector3(a.x-off.x,y,a.y-off.y), Vector3(b.x-off.x,y,b.y-off.y), Vector3(b.x+off.x,y,b.y+off.y), Vector3(a.x+off.x,y,a.y+off.y))
 
+func _polygon_area(points: PackedVector2Array) -> float:
+	var area := 0.0
+	for i in range(points.size()):
+		var a := points[i]
+		var b := points[(i + 1) % points.size()]
+		area += a.x * b.y - b.x * a.y
+	return area * 0.5
+
 func _add_building(walls: Array[SurfaceTool], roofs: SurfaceTool, building: Dictionary) -> bool:
 	var raw: Array = building.get("points", [])
 	if raw.size() < 4:
@@ -149,6 +157,8 @@ func _add_building(walls: Array[SurfaceTool], roofs: SurfaceTool, building: Dict
 		outline.remove_at(outline.size()-1)
 	if outline.size() < 3 or outline.size() > 120:
 		return false
+	if absf(_polygon_area(outline)) < 8.0:
+		return false
 	var min_x := INF
 	var max_x := -INF
 	var min_z := INF
@@ -160,11 +170,11 @@ func _add_building(walls: Array[SurfaceTool], roofs: SurfaceTool, building: Dict
 		max_z = maxf(max_z,p.y)
 	if max_x-min_x > 110.0 or max_z-min_z > 110.0:
 		return false
-	var indices := Geometry2D.triangulate_polygon(outline)
+	var indices: PackedInt32Array = Geometry2D.triangulate_polygon(outline)
 	if indices.is_empty():
 		return false
 	var height := clampf(float(building.get("height", 11.0)), 4.0, 90.0)
-	var facade := walls[int(building.get("id",0)) % walls.size()]
+	var facade: SurfaceTool = walls[int(building.get("id",0)) % walls.size()]
 	for i in range(outline.size()):
 		var a := outline[i]
 		var b := outline[(i+1) % outline.size()]
