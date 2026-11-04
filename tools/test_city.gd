@@ -4,6 +4,10 @@ func _initialize() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
+	var game_script: Script = load("res://scripts/game.gd") as Script
+	if game_script == null:
+		_fail("Main driving game script did not parse")
+		return
 	var script: Script = load("res://scripts/city_world.gd") as Script
 	if script == null:
 		_fail("City script did not load")
