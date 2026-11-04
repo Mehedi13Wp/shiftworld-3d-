@@ -9,6 +9,8 @@ var lane_material: StandardMaterial3D
 var wall_materials: Array[StandardMaterial3D] = []
 var roof_material: StandardMaterial3D
 var ground_material: StandardMaterial3D
+var glass_material: StandardMaterial3D
+var window_count := 0
 
 func _mat(color: Color) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
@@ -22,6 +24,9 @@ func _setup_materials() -> void:
 	lane_material = _mat(Color(0.92, 0.89, 0.72))
 	roof_material = _mat(Color(0.38, 0.40, 0.43))
 	ground_material = _mat(Color(0.25, 0.34, 0.27))
+	glass_material = _mat(Color(0.12, 0.21, 0.29))
+	glass_material.metallic = 0.18
+	glass_material.roughness = 0.30
 	wall_materials.clear()
 	for c in [Color(0.65,0.67,0.68), Color(0.72,0.67,0.60), Color(0.59,0.62,0.65), Color(0.69,0.64,0.59)]:
 		wall_materials.append(_mat(c))
@@ -68,15 +73,34 @@ func load_city(city_id: String) -> bool:
 		walls.append(st)
 	var roofs := SurfaceTool.new()
 	roofs.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var glass := SurfaceTool.new()
+	glass.begin(Mesh.PRIMITIVE_TRIANGLES)
+	window_count = 0
+	# OSM ordering is arbitrary. Prioritize buildings around Times Square/spawn.
+	var buildings: Array = data.get("buildings", [])
+	buildings.sort_custom(func(a, b):
+		var pa: Array = a.get("points", [])
+		var pb: Array = b.get("points", [])
+		if pa.is_empty():
+			return false
+		if pb.is_empty():
+			return true
+		var ax: float = float(pa[0][0])
+		var az: float = float(pa[0][1])
+		var bx: float = float(pb[0][0])
+		var bz: float = float(pb[0][1])
+		return ax * ax + az * az < bx * bx + bz * bz
+	)
 	var count := 0
-	for building in data.get("buildings", []):
-		if _add_building(walls, roofs, building):
+	for building in buildings:
+		if _add_building(walls, roofs, glass, building):
 			count += 1
 			if count >= 650:
 				break
 	for i in range(walls.size()):
 		_commit(walls[i], wall_materials[i], "BuildingWalls" + str(i))
 	_commit(roofs, roof_material, "Roofs")
+	_commit(glass, glass_material, "FacadeWindows")
 	return true
 
 func _commit(st: SurfaceTool, material: StandardMaterial3D, node_name: String) -> void:
@@ -144,7 +168,34 @@ func _polygon_area(points: PackedVector2Array) -> float:
 		area += a.x * b.y - b.x * a.y
 	return area * 0.5
 
-func _add_building(walls: Array[SurfaceTool], roofs: SurfaceTool, building: Dictionary) -> bool:
+func _add_facade_windows(glass: SurfaceTool, a: Vector2, b: Vector2, height: float, signed_area: float) -> void:
+	if window_count >= 12000 or height < 7.0:
+		return
+	var edge := b - a
+	var length := edge.length()
+	if length < 5.0:
+		return
+	var forward := edge / length
+	var outward := Vector2(forward.y, -forward.x) * (1.0 if signed_area > 0.0 else -1.0)
+	var floors := mini(int(height / 3.8), 23)
+	var windows_across := mini(int(length / 3.0), 32)
+	for floor_index in range(1, floors):
+		var bottom := float(floor_index) * 3.8 + 0.15
+		var top := minf(bottom + 1.85, height - 0.25)
+		if top <= bottom:
+			continue
+		for i in range(windows_across):
+			if window_count >= 12000:
+				return
+			var t := float(i) * 3.0 + 1.45
+			if t + 0.75 >= length:
+				break
+			var left := a + forward * (t - 0.75) + outward * 0.07
+			var right := a + forward * (t + 0.75) + outward * 0.07
+			_quad(glass, Vector3(left.x,bottom,left.y), Vector3(right.x,bottom,right.y), Vector3(right.x,top,right.y), Vector3(left.x,top,left.y))
+			window_count += 1
+
+func _add_building(walls: Array[SurfaceTool], roofs: SurfaceTool, glass: SurfaceTool, building: Dictionary) -> bool:
 	var raw: Array = building.get("points", [])
 	if raw.size() < 4:
 		return false
@@ -175,10 +226,15 @@ func _add_building(walls: Array[SurfaceTool], roofs: SurfaceTool, building: Dict
 		return false
 	var height := clampf(float(building.get("height", 11.0)), 4.0, 90.0)
 	var facade: SurfaceTool = walls[int(building.get("id",0)) % walls.size()]
+	var facade_area := _polygon_area(outline)
+	var building_center := Vector2((min_x + max_x) * 0.5, (min_z + max_z) * 0.5)
+	var show_windows := building_center.length_squared() < 550.0 * 550.0
 	for i in range(outline.size()):
 		var a := outline[i]
 		var b := outline[(i+1) % outline.size()]
 		_quad(facade, Vector3(a.x,0,a.y), Vector3(b.x,0,b.y), Vector3(b.x,height,b.y), Vector3(a.x,height,a.y))
+		if show_windows:
+			_add_facade_windows(glass, a, b, height, facade_area)
 	for i in range(0,indices.size(),3):
 		var a := outline[indices[i]]
 		var b := outline[indices[i+1]]
