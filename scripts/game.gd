@@ -18,6 +18,7 @@ var coins := 0
 var city_velocity := 0.0
 var reverse_gear := false
 var collision_flash := 0.0
+var driving_buttons: Array[Button] = []
 var speed := 0.0
 var steering := 0.0
 var accelerating := false
@@ -555,6 +556,8 @@ func _choose_mode(mode: int) -> void:
 	difficulty = mode
 	game_started = true
 	menu_panel.visible = false
+	for btn in driving_buttons:
+		btn.visible = true
 	speed = 0.0
 	if music_enabled and is_instance_valid(music_player):
 		music_player.play()
@@ -642,9 +645,9 @@ func _create_ui() -> void:
 	mission_label.anchor_left = 0.5
 	mission_label.anchor_right = 0.5
 	mission_label.offset_left = -325
-	mission_label.offset_top = 18
+	mission_label.offset_top = 108
 	mission_label.offset_right = 325
-	mission_label.offset_bottom = 70
+	mission_label.offset_bottom = 156
 	mission_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	mission_label.add_theme_font_size_override("font_size", 25)
 	mission_label.add_theme_color_override("font_color", Color(0.23, 1.0, 0.87))
@@ -710,6 +713,9 @@ func _create_ui() -> void:
 	var gas := _hud_button(ui, "GAS", Vector2(1, 1), Vector2(-170, -135), Vector2(148, 105))
 	gas.button_down.connect(func(): accelerating = true)
 	gas.button_up.connect(func(): accelerating = false)
+	driving_buttons = [left, right, brake, gas]
+	for btn in driving_buttons:
+		btn.visible = false
 	gear_button = _hud_button(ui, "GEAR: D", Vector2(1, 1), Vector2(-170, -210), Vector2(148, 62))
 	gear_button.add_theme_font_size_override("font_size", 22)
 	gear_button.visible = false
