@@ -33,6 +33,9 @@ var effect_player: AudioStreamPlayer
 var music_button: Button
 var sound_button: Button
 var menu_panel: PanelContainer
+var city_mode := false
+var city_world: Node3D
+var city_data_ready := false
 var car_paint := Color(0.82, 0.025, 0.035)
 const SUPERCAR_MODEL_PATH := "res://assets/vehicles/red_supercar.glb"
 const TREE_MODEL_PATH := "res://assets/nature/tree_detailed.glb"
@@ -452,6 +455,41 @@ func _create_audio() -> void:
 	effect_player.stream = _tone_stream(110.0, 0.48, 0.32)
 	add_child(effect_player)
 
+func _start_city_mode() -> void:
+	var path := "res://data/cities/manhattan.json"
+	if not FileAccess.file_exists(path):
+		status_label.text = "MANHATTAN MAP NOT INSTALLED"
+		return
+	# Hide the scrolling highway and load the OSM-derived city world.
+	# The existing driving UI, audio, collision and highway mode remain intact.
+	city_world = Node3D.new()
+	var city_script := load("res://scripts/city_world.gd") as Script
+	if city_script == null:
+		status_label.text = "CITY RENDERER MISSING"
+		return
+	city_world.set_script(city_script)
+	add_child(city_world)
+	if not city_world.call("load_city", "manhattan"):
+		city_world.queue_free()
+		status_label.text = "CITY MAP FAILED"
+		return
+	city_data_ready = true
+	city_mode = true
+	# City center map coordinates start at zero; the player stays at a local origin.
+	# Hide legacy highway meshes, but keep player, camera, UI and audio.
+	for child in get_children():
+		if child is MeshInstance3D and child != car:
+			child.visible = false
+	for marker in lane_marks:
+		marker.visible = false
+	for segment in roadside:
+		segment.visible = false
+	for landmark in landmarks:
+		landmark.visible = false
+	for obstacle in obstacles:
+		obstacle.visible = false
+	_choose_mode(0)
+
 func _choose_mode(mode: int) -> void:
 	difficulty = mode
 	game_started = true
@@ -505,10 +543,16 @@ func _create_ui() -> void:
 	menu.add_theme_constant_override("separation", 15)
 	menu_panel.add_child(menu)
 	var heading := Label.new()
-	heading.text = "SHIFTWORLD 3D\nCHOOSE DIFFICULTY"
+	heading.text = "SHIFTWORLD 3D\nSELECT DRIVING MODE"
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	heading.add_theme_font_size_override("font_size", 29)
 	menu.add_child(heading)
+	var city_button := Button.new()
+	city_button.text = "NEW YORK / MANHATTAN"
+	city_button.custom_minimum_size = Vector2(430, 75)
+	city_button.add_theme_font_size_override("font_size", 23)
+	menu.add_child(city_button)
+	city_button.pressed.connect(_start_city_mode)
 	for i in range(3):
 		var mode_button := Button.new()
 		mode_button.text = ["NORMAL", "MEDIUM", "HARD"][i]
@@ -548,6 +592,13 @@ func _process(delta: float) -> void:
 	camera.position.x = lerp(camera.position.x, car.position.x, min(delta * 3.0, 1.0))
 	for wheel in wheels:
 		wheel.rotate_x(speed * delta * 1.7)
+	if city_mode:
+		car.position.z -= speed * delta
+		camera.position.z = car.position.z + 8.0
+		camera.look_at(car.position + Vector3(0, 0.6, -5.0), Vector3.UP)
+		camera.position.x = lerp(camera.position.x, car.position.x, min(delta * 3.0, 1.0))
+		score_label.text = "MANHATTAN | DISTANCE: %dm | SPEED: %d km/h" % [int(distance), int(speed * 3.6)]
+		return
 	for marker in lane_marks:
 		marker.position.z += speed * delta
 		if marker.position.z > 14.0:
