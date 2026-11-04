@@ -21,6 +21,7 @@ func load_city(city_id: String) -> bool:
 		city_root.queue_free()
 	city_root = Node3D.new()
 	add_child(city_root)
+	_add_ground()
 	for road in data["roads"]:
 		var pts: Array = road.get("points", [])
 		for i in range(pts.size()-1):
@@ -30,6 +31,18 @@ func load_city(city_id: String) -> bool:
 	for building in data.get("buildings",[]):
 		_add_building(building)
 	return true
+
+func _add_ground() -> void:
+	var ground := MeshInstance3D.new()
+	var mesh := PlaneMesh.new()
+	mesh.size = Vector2(1600.0,1600.0)
+	ground.mesh = mesh
+	ground.position.y = -0.08
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.30,0.36,0.29)
+	material.roughness = 1.0
+	ground.material_override = material
+	city_root.add_child(ground)
 
 func _add_road_segment(a: Vector3,b: Vector3,road_type: String) -> void:
 	var length := a.distance_to(b)
