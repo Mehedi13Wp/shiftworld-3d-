@@ -39,7 +39,7 @@ var city_data_ready := false
 var city_heading := 0.0
 var city_spawn := Vector3.ZERO
 var car_paint := Color(0.82, 0.025, 0.035)
-const SUPERCAR_MODEL_PATH := "res://assets/vehicles/red_supercar.glb"
+const SUPERCAR_MODEL_PATH := "res://assets/vehicles/sedan_sports.glb"
 const TREE_MODEL_PATH := "res://assets/nature/tree_detailed.glb"
 const OAK_MODEL_PATH := "res://assets/nature/tree_oak.glb"
 const ROAD_TEXTURE_PATH := "res://assets/roads/asphalt.jpg"
@@ -274,12 +274,12 @@ func _create_car() -> void:
 			if model != null:
 				car.add_child(model)
 				# Asset body: tuned after actual GLB import; no procedural car overlays.
-				model.rotation.y = -PI / 2.0
+				model.rotation.y = 0.0
 				# The imported sports car is built lengthwise on X (nose toward -X).
 				# Rotate its nose toward the highway (-Z), then fit to road scale.
 				_fit_imported_car(model)
 				# Repaint body panels red while preserving glass, rubber and lights.
-				_repaint_supercar(model)
+				# Keep original Kenney body, glass, wheel and trim materials.
 			else:
 				_create_supercar_preview()
 		else:
@@ -497,8 +497,8 @@ func _start_city_mode() -> void:
 	city_heading = atan2(-direction.x,-direction.z)
 	car.position = city_spawn + Vector3(0,0.67,0)
 	car.rotation.y = city_heading
-	camera.position = car.position + Vector3(-sin(city_heading)*8.0,3.7,cos(city_heading)*8.0)
-	camera.look_at(car.position+Vector3.UP*0.5,Vector3.UP)
+	camera.position = car.position + Vector3(sin(city_heading)*11.5,4.7,cos(city_heading)*11.5)
+	camera.look_at(car.position+Vector3.UP*1.1,Vector3.UP)
 	# City center map coordinates start at zero; the player stays at a local origin.
 	# Hide legacy highway meshes, but keep player, camera, UI and audio.
 	for child in get_children():
@@ -619,12 +619,12 @@ func _process(delta: float) -> void:
 	for wheel in wheels:
 		wheel.rotate_x(speed * delta * 1.7)
 	if city_mode:
-		city_heading += steering * delta * (0.45 + speed * 0.025)
+		city_heading -= steering * delta * (0.45 + speed * 0.025)
 		car.rotation.y = city_heading
 		car.position += Vector3(-sin(city_heading),0,-cos(city_heading)) * speed * delta
-		var behind := car.position + Vector3(sin(city_heading)*8.5,3.8,cos(city_heading)*8.5)
+		var behind := car.position + Vector3(sin(city_heading)*11.5,4.7,cos(city_heading)*11.5)
 		camera.position = camera.position.lerp(behind,minf(delta*4.0,1.0))
-		camera.look_at(car.position + Vector3(0,0.7,0),Vector3.UP)
+		camera.look_at(car.position + Vector3(0,1.1,0),Vector3.UP)
 		score_label.text = "MANHATTAN | %dm | %d km/h\nMap: © OpenStreetMap contributors (ODbL)" % [int(distance), int(speed * 3.6)]
 		return
 	for marker in lane_marks:
