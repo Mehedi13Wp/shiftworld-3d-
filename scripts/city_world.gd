@@ -168,8 +168,8 @@ func _polygon_area(points: PackedVector2Array) -> float:
 		area += a.x * b.y - b.x * a.y
 	return area * 0.5
 
-func _add_facade_windows(glass: SurfaceTool, a: Vector2, b: Vector2, height: float, signed_area: float) -> void:
-	if window_count >= 12000 or height < 7.0:
+func _add_facade_windows(glass: SurfaceTool, a: Vector2, b: Vector2, height: float, signed_area: float, window_quota: int) -> void:
+	if window_count >= 20000 or height < 7.0 or window_quota <= 0:
 		return
 	var edge := b - a
 	var length := edge.length()
@@ -178,20 +178,26 @@ func _add_facade_windows(glass: SurfaceTool, a: Vector2, b: Vector2, height: flo
 	var forward := edge / length
 	var outward := Vector2(forward.y, -forward.x) * (1.0 if signed_area > 0.0 else -1.0)
 	var floors := mini(int(height / 3.8), 23)
-	var windows_across := mini(int(length / 3.0), 32)
-	for floor_index in range(1, floors):
+	var max_columns := maxi(1, int(length / 3.0))
+	if floors <= 1:
+		return
+	# Spread a limited number of windows across the entire facade instead
+	# of exhausting the mobile GPU vertex budget on the first tall building.
+	var rows := mini(floors - 1, maxi(1, int(sqrt(float(window_quota)))))
+	var columns := mini(max_columns, maxi(1, int(ceil(float(window_quota) / float(rows)))))
+	for row_index in range(rows):
+		var floor_index := 1 + int(float(row_index) * float(floors - 1) / float(rows))
 		var bottom := float(floor_index) * 3.8 + 0.15
 		var top := minf(bottom + 1.85, height - 0.25)
 		if top <= bottom:
 			continue
-		for i in range(windows_across):
-			if window_count >= 12000:
+		for i in range(columns):
+			if window_count >= 20000:
 				return
-			var t := float(i) * 3.0 + 1.45
-			if t + 0.75 >= length:
-				break
-			var left := a + forward * (t - 0.75) + outward * 0.07
-			var right := a + forward * (t + 0.75) + outward * 0.07
+			var t := float(i + 1) * length / float(columns + 1)
+			var half_width := minf(0.80, length / float(columns + 1) * 0.30)
+			var left := a + forward * (t - half_width) + outward * 0.07
+			var right := a + forward * (t + half_width) + outward * 0.07
 			_quad(glass, Vector3(left.x,bottom,left.y), Vector3(right.x,bottom,right.y), Vector3(right.x,top,right.y), Vector3(left.x,top,left.y))
 			window_count += 1
 
@@ -229,12 +235,15 @@ func _add_building(walls: Array[SurfaceTool], roofs: SurfaceTool, glass: Surface
 	var facade_area := _polygon_area(outline)
 	var building_center := Vector2((min_x + max_x) * 0.5, (min_z + max_z) * 0.5)
 	var show_windows := building_center.length_squared() < 550.0 * 550.0
+	var distance_to_center := building_center.length()
+	var window_budget := 60 if distance_to_center < 200.0 else (40 if distance_to_center < 350.0 else 20)
+	var per_wall_budget := maxi(1, int(ceil(float(window_budget) / float(outline.size()))))
 	for i in range(outline.size()):
 		var a := outline[i]
 		var b := outline[(i+1) % outline.size()]
 		_quad(facade, Vector3(a.x,0,a.y), Vector3(b.x,0,b.y), Vector3(b.x,height,b.y), Vector3(a.x,height,a.y))
 		if show_windows:
-			_add_facade_windows(glass, a, b, height, facade_area)
+			_add_facade_windows(glass, a, b, height, facade_area, per_wall_budget)
 	for i in range(0,indices.size(),3):
 		var a := outline[indices[i]]
 		var b := outline[indices[i+1]]
