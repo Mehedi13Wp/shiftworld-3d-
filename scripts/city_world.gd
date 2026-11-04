@@ -39,7 +39,7 @@ func load_city(city_id: String) -> bool:
 		var db: float = float(pb[0][0]) * float(pb[0][0]) + float(pb[0][1]) * float(pb[0][1])
 		return da < db
 	)
-	for i in range(mini(buildings.size(), 550)):
+	for i in range(mini(buildings.size(), 420)):
 		_add_building(buildings[i])
 	return true
 
@@ -85,14 +85,21 @@ func _add_building(building: Dictionary) -> void:
 		max_x = maxf(max_x,float(point[0]))
 		min_z = minf(min_z,float(point[1]))
 		max_z = maxf(max_z,float(point[1]))
-	var height := float(building.get("height",11.0))
+	var footprint_width := max_x - min_x
+	var footprint_depth := max_z - min_z
+	if footprint_width > 34.0 or footprint_depth > 34.0:
+		return
+	if footprint_width < 2.0 or footprint_depth < 2.0:
+		return
+	var height := clampf(float(building.get("height",11.0)),5.0,75.0)
 	var mesh := BoxMesh.new()
-	mesh.size = Vector3(maxf(1.0,max_x-min_x),height,maxf(1.0,max_z-min_z))
+	mesh.size = Vector3(footprint_width,height,footprint_depth)
 	var instance := MeshInstance3D.new()
 	instance.mesh = mesh
 	instance.position = Vector3((min_x+max_x)*0.5,height*0.5,(min_z+max_z)*0.5)
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.62,0.64,0.66)
+	var tone := float(int(building.get("id",0)) % 5) * 0.035
+	mat.albedo_color = Color(0.56+tone,0.58+tone,0.61+tone)
 	mat.roughness = 0.88
 	instance.material_override = mat
 	city_root.add_child(instance)
