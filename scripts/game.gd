@@ -10,6 +10,14 @@ const MIN_SPEED := 0.0
 
 var car: Node3D
 var camera: Camera3D
+var city_challenge: Node3D
+var mission_label: Label
+var coins_label: Label
+var gear_button: Button
+var coins := 0
+var city_velocity := 0.0
+var reverse_gear := false
+var collision_flash := 0.0
 var speed := 0.0
 var steering := 0.0
 var accelerating := false
@@ -46,6 +54,7 @@ const ROAD_TEXTURE_PATH := "res://assets/roads/asphalt.jpg"
 var traffic_colors := [Color(0.64, 0.07, 0.08), Color(0.12, 0.23, 0.35), Color(0.83, 0.84, 0.85), Color(0.14, 0.16, 0.19)]
 
 func _ready() -> void:
+	_load_progress()
 	_create_environment()
 	_roadside_details()
 	_create_car()
@@ -263,9 +272,18 @@ func _create_service_area() -> void:
 		_tree(planter, 34.0, i % 2 == 0, 3 if i % 2 == 0 else 2)
 
 func _create_car() -> void:
-	car = Node3D.new()
+	var body := CharacterBody3D.new()
+	body.name = "DriverCar"
+	body.collision_layer = 2
+	body.collision_mask = 1
+	car = body
 	add_child(car)
 	car.position = Vector3(2.0, 0.67, 4.0)
+	var collider := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(1.75, 1.05, 3.95)
+	collider.shape = shape
+	car.add_child(collider)
 	# A licensed GLB can replace the procedural preview without changing driving controls.
 	if ResourceLoader.exists(SUPERCAR_MODEL_PATH):
 		var scene := load(SUPERCAR_MODEL_PATH) as PackedScene
@@ -482,6 +500,7 @@ func _start_city_mode() -> void:
 	var nearest := INF
 	var chosen_a := Vector3.ZERO
 	var chosen_b := Vector3(0,0,-1)
+	var chosen_road_name := ""
 	for road in map_data.get("roads", []):
 		var pts: Array = road.get("points", [])
 		for i in range(pts.size()-1):
@@ -492,11 +511,14 @@ func _start_city_mode() -> void:
 				nearest = d
 				chosen_a = a
 				chosen_b = b
+				chosen_road_name = str(road.get("name", ""))
 	city_spawn = (chosen_a + chosen_b)*0.5
 	var direction := (chosen_b-chosen_a).normalized()
 	city_heading = atan2(-direction.x,-direction.z)
 	car.position = city_spawn + Vector3(0,0.67,0)
 	car.rotation.y = city_heading
+	city_velocity = 0.0
+	reverse_gear = false
 	camera.position = car.position + Vector3(sin(city_heading)*11.5,4.7,cos(city_heading)*11.5)
 	camera.look_at(car.position+Vector3.UP*1.1,Vector3.UP)
 	# City center map coordinates start at zero; the player stays at a local origin.
@@ -512,6 +534,21 @@ func _start_city_mode() -> void:
 		landmark.visible = false
 	for obstacle in obstacles:
 		obstacle.visible = false
+	var challenge_script := load("res://scripts/city_challenge.gd") as Script
+	if challenge_script != null:
+		city_challenge = Node3D.new()
+		city_challenge.set_script(challenge_script)
+		add_child(city_challenge)
+		if bool(city_challenge.call("setup", map_data, city_spawn, city_heading, chosen_road_name)):
+			city_challenge.connect("checkpoint_reached", Callable(self, "_on_checkpoint_reached"))
+			city_challenge.connect("run_completed", Callable(self, "_on_run_completed"))
+		else:
+			city_challenge.queue_free()
+			city_challenge = null
+	mission_label.visible = true
+	coins_label.visible = true
+	gear_button.visible = true
+	gear_button.text = "GEAR: D"
 	_choose_mode(0)
 
 func _choose_mode(mode: int) -> void:
@@ -524,27 +561,125 @@ func _choose_mode(mode: int) -> void:
 		if is_instance_valid(music_test_label):
 			music_test_label.text = "MUSIC: PLAYING" if music_player.playing else "MUSIC: FAILED"
 
+func _load_progress() -> void:
+	if not FileAccess.file_exists("user://shiftworld_progress.json"):
+		return
+	var file := FileAccess.open("user://shiftworld_progress.json", FileAccess.READ)
+	if file == null:
+		return
+	var data = JSON.parse_string(file.get_as_text())
+	if data is Dictionary:
+		coins = maxi(0, int(data.get("coins", 0)))
+
+func _save_progress() -> void:
+	var file := FileAccess.open("user://shiftworld_progress.json", FileAccess.WRITE)
+	if file != null:
+		file.store_string(JSON.stringify({"coins": coins}))
+
+func _on_checkpoint_reached(reward: int) -> void:
+	coins += reward
+	coins_label.text = "COINS  %d" % coins
+	status_label.text = "+%d  CHECKPOINT!" % reward
+	_save_progress()
+
+func _on_run_completed(reward: int) -> void:
+	coins += reward
+	coins_label.text = "COINS  %d" % coins
+	status_label.text = "RUN COMPLETE! +%d COINS" % reward
+	_save_progress()
+
+func _toggle_gear() -> void:
+	if city_mode and absf(city_velocity) < 0.7:
+		reverse_gear = not reverse_gear
+		gear_button.text = "GEAR: R" if reverse_gear else "GEAR: D"
+
+func _hud_button(parent: Control, title: String, anchor: Vector2, offset: Vector2, dimensions: Vector2) -> Button:
+	var btn := Button.new()
+	btn.text = title
+	btn.anchor_left = anchor.x
+	btn.anchor_right = anchor.x
+	btn.anchor_top = anchor.y
+	btn.anchor_bottom = anchor.y
+	btn.offset_left = offset.x
+	btn.offset_top = offset.y
+	btn.offset_right = offset.x + dimensions.x
+	btn.offset_bottom = offset.y + dimensions.y
+	btn.add_theme_font_size_override("font_size", 25)
+	btn.add_theme_color_override("font_color", Color.WHITE)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.04, 0.10, 0.17, 0.85)
+	style.border_color = Color(0.12, 0.72, 0.74, 0.82)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(15)
+	btn.add_theme_stylebox_override("normal", style)
+	var active := style.duplicate() as StyleBoxFlat
+	active.bg_color = Color(0.02, 0.50, 0.55, 0.95)
+	btn.add_theme_stylebox_override("pressed", active)
+	btn.add_theme_stylebox_override("hover", active)
+	parent.add_child(btn)
+	return btn
+
 func _create_ui() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
 	var ui := Control.new()
-	ui.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	layer.add_child(ui)
+	ui.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
 	score_label = Label.new()
-	score_label.position = Vector2(22, 32)
-	score_label.add_theme_font_size_override("font_size", 28)
+	score_label.anchor_left = 0.0
+	score_label.anchor_right = 0.0
+	score_label.offset_left = 24
+	score_label.offset_top = 18
+	score_label.offset_right = 495
+	score_label.offset_bottom = 104
+	score_label.add_theme_font_size_override("font_size", 27)
+	score_label.add_theme_color_override("font_color", Color(0.96, 0.98, 1.0))
 	ui.add_child(score_label)
+
+	mission_label = Label.new()
+	mission_label.anchor_left = 0.5
+	mission_label.anchor_right = 0.5
+	mission_label.offset_left = -325
+	mission_label.offset_top = 18
+	mission_label.offset_right = 325
+	mission_label.offset_bottom = 70
+	mission_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	mission_label.add_theme_font_size_override("font_size", 25)
+	mission_label.add_theme_color_override("font_color", Color(0.23, 1.0, 0.87))
+	mission_label.visible = false
+	ui.add_child(mission_label)
+
+	coins_label = Label.new()
+	coins_label.anchor_left = 1.0
+	coins_label.anchor_right = 1.0
+	coins_label.offset_left = -235
+	coins_label.offset_top = 85
+	coins_label.offset_right = -22
+	coins_label.offset_bottom = 129
+	coins_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	coins_label.add_theme_font_size_override("font_size", 26)
+	coins_label.text = "COINS  %d" % coins
+	coins_label.visible = false
+	ui.add_child(coins_label)
+
 	status_label = Label.new()
-	status_label.position = Vector2(115, 310)
-	status_label.add_theme_font_size_override("font_size", 38)
+	status_label.anchor_left = 0.5
+	status_label.anchor_right = 0.5
+	status_label.anchor_top = 0.5
+	status_label.anchor_bottom = 0.5
+	status_label.offset_left = -400
+	status_label.offset_right = 400
+	status_label.offset_top = -70
+	status_label.offset_bottom = 10
+	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	status_label.add_theme_font_size_override("font_size", 31)
+	status_label.add_theme_color_override("font_color", Color(0.12, 1.0, 0.83))
 	ui.add_child(status_label)
 
-	music_test_label = Label.new()
-	music_test_label.position = Vector2(22, 208)
-	music_test_label.add_theme_font_size_override("font_size", 20)
-	music_test_label.text = "MUSIC: READY"
-	ui.add_child(music_test_label)
-	music_button = _button(ui, "MUSIC ON", Vector2(20, 135), Vector2(170, 65))
+	music_button = _hud_button(ui, "MUSIC ON", Vector2(1, 0), Vector2(-420, 15), Vector2(132, 58))
+	music_button.add_theme_font_size_override("font_size", 19)
 	music_button.pressed.connect(func():
 		music_enabled = not music_enabled
 		music_button.text = "MUSIC ON" if music_enabled else "MUSIC OFF"
@@ -552,57 +687,126 @@ func _create_ui() -> void:
 			music_player.play()
 		else:
 			music_player.stop()
-		music_test_label.text = "MUSIC: PLAYING" if music_player.playing else "MUSIC: OFF"
 	)
-	sound_button = _button(ui, "SOUND ON", Vector2(195, 135), Vector2(175, 65))
+	sound_button = _hud_button(ui, "SOUND ON", Vector2(1, 0), Vector2(-280, 15), Vector2(130, 58))
+	sound_button.add_theme_font_size_override("font_size", 19)
 	sound_button.pressed.connect(func():
 		sound_enabled = not sound_enabled
 		sound_button.text = "SOUND ON" if sound_enabled else "SOUND OFF"
 	)
+	var restart := _hud_button(ui, "RESTART", Vector2(1, 0), Vector2(-142, 15), Vector2(130, 58))
+	restart.add_theme_font_size_override("font_size", 20)
+	restart.pressed.connect(func(): get_tree().reload_current_scene())
+
+	var left := _hud_button(ui, "LEFT", Vector2(0, 1), Vector2(22, -135), Vector2(138, 105))
+	left.button_down.connect(func(): steering = -1.0)
+	left.button_up.connect(func(): steering = 0.0)
+	var right := _hud_button(ui, "RIGHT", Vector2(0, 1), Vector2(170, -135), Vector2(138, 105))
+	right.button_down.connect(func(): steering = 1.0)
+	right.button_up.connect(func(): steering = 0.0)
+	var brake := _hud_button(ui, "BRAKE", Vector2(1, 1), Vector2(-320, -135), Vector2(138, 105))
+	brake.button_down.connect(func(): braking = true)
+	brake.button_up.connect(func(): braking = false)
+	var gas := _hud_button(ui, "GAS", Vector2(1, 1), Vector2(-170, -135), Vector2(148, 105))
+	gas.button_down.connect(func(): accelerating = true)
+	gas.button_up.connect(func(): accelerating = false)
+	gear_button = _hud_button(ui, "GEAR: D", Vector2(1, 1), Vector2(-170, -210), Vector2(148, 62))
+	gear_button.add_theme_font_size_override("font_size", 22)
+	gear_button.visible = false
+	gear_button.pressed.connect(_toggle_gear)
+
 	menu_panel = PanelContainer.new()
-	menu_panel.position = Vector2(125, 335)
-	menu_panel.custom_minimum_size = Vector2(470, 390)
+	menu_panel.anchor_left = 0.5
+	menu_panel.anchor_right = 0.5
+	menu_panel.anchor_top = 0.5
+	menu_panel.anchor_bottom = 0.5
+	menu_panel.offset_left = -272
+	menu_panel.offset_right = 272
+	menu_panel.offset_top = -267
+	menu_panel.offset_bottom = 267
+	var menu_style := StyleBoxFlat.new()
+	menu_style.bg_color = Color(0.04, 0.075, 0.12, 0.96)
+	menu_style.border_color = Color(0.13, 0.84, 0.82, 0.9)
+	menu_style.set_border_width_all(2)
+	menu_style.set_corner_radius_all(20)
+	menu_style.content_margin_left = 24
+	menu_style.content_margin_right = 24
+	menu_style.content_margin_top = 20
+	menu_style.content_margin_bottom = 20
+	menu_panel.add_theme_stylebox_override("panel", menu_style)
 	ui.add_child(menu_panel)
 	var menu := VBoxContainer.new()
 	menu.add_theme_constant_override("separation", 15)
 	menu_panel.add_child(menu)
 	var heading := Label.new()
-	heading.text = "SHIFTWORLD 3D\nSELECT DRIVING MODE"
+	heading.text = "SHIFTWORLD 3D\nDRIVE THE WORLD"
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	heading.add_theme_font_size_override("font_size", 29)
+	heading.add_theme_font_size_override("font_size", 30)
+	heading.add_theme_color_override("font_color", Color(0.18, 0.98, 0.86))
 	menu.add_child(heading)
 	var city_button := Button.new()
-	city_button.text = "NEW YORK / MANHATTAN" if FileAccess.file_exists("res://data/cities/manhattan.json") else "NEW YORK (MAP DOWNLOAD PENDING)"
+	city_button.text = "MANHATTAN  |  CHECKPOINT RUN"
 	city_button.disabled = not FileAccess.file_exists("res://data/cities/manhattan.json")
-	city_button.custom_minimum_size = Vector2(430, 75)
-	city_button.add_theme_font_size_override("font_size", 23)
+	city_button.custom_minimum_size = Vector2(480, 86)
+	city_button.add_theme_font_size_override("font_size", 22)
 	menu.add_child(city_button)
 	city_button.pressed.connect(_start_city_mode)
+	var caption := Label.new()
+	caption.text = "FREE DRIVE / LEGACY HIGHWAY"
+	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	caption.add_theme_font_size_override("font_size", 17)
+	menu.add_child(caption)
 	for i in range(3):
 		var mode_button := Button.new()
 		mode_button.text = ["NORMAL", "MEDIUM", "HARD"][i]
-		mode_button.custom_minimum_size = Vector2(430, 80)
-		mode_button.add_theme_font_size_override("font_size", 27)
+		mode_button.custom_minimum_size = Vector2(480, 62)
+		mode_button.add_theme_font_size_override("font_size", 24)
 		menu.add_child(mode_button)
 		mode_button.pressed.connect(_choose_mode.bind(i))
 
-	var left := _button(ui, "LEFT", Vector2(22, 1060), Vector2(150, 100))
-	left.button_down.connect(func(): steering = -1.0)
-	left.button_up.connect(func(): steering = 0.0)
-	var right := _button(ui, "RIGHT", Vector2(182, 1060), Vector2(150, 100))
-	right.button_down.connect(func(): steering = 1.0)
-	right.button_up.connect(func(): steering = 0.0)
-	var brake := _button(ui, "BRAKE", Vector2(390, 1060), Vector2(145, 100))
-	brake.button_down.connect(func(): braking = true)
-	brake.button_up.connect(func(): braking = false)
-	var gas := _button(ui, "GAS", Vector2(545, 1060), Vector2(145, 100))
-	gas.button_down.connect(func(): accelerating = true)
-	gas.button_up.connect(func(): accelerating = false)
-	var restart := _button(ui, "RESTART", Vector2(255, 1180), Vector2(210, 75))
-	restart.pressed.connect(func(): get_tree().reload_current_scene())
+func _physics_process(delta: float) -> void:
+	if not city_mode or not game_started or crashed:
+		return
+	var desired := 0.0
+	if accelerating and not braking:
+		desired = -5.5 if reverse_gear else 21.0
+	var friction := 2.5 + absf(city_velocity) * 0.18
+	var response := 23.0 if braking else (8.0 if accelerating else friction)
+	city_velocity = move_toward(city_velocity, desired, response * delta)
+	var velocity_magnitude := absf(city_velocity)
+	var steering_ratio := minf(velocity_magnitude / 3.5, 1.0)
+	if velocity_magnitude > 0.1:
+		city_heading -= steering * signf(city_velocity) * steering_ratio * (0.32 + velocity_magnitude * 0.028) * delta
+	car.rotation.y = city_heading
+	var forward := Vector3(-sin(city_heading), 0, -cos(city_heading))
+	var from := car.position
+	var hit := (car as CharacterBody3D).move_and_collide(forward * city_velocity * delta)
+	if hit != null:
+		city_velocity = 0.0
+		collision_flash = 1.5
+	distance += from.distance_to(car.position)
+	speed = absf(city_velocity)
+	if collision_flash > 0.0:
+		collision_flash -= delta
+		status_label.text = "BUILDING COLLISION - CHANGE DIRECTION"
+	elif status_label.text.begins_with("BUILDING COLLISION"):
+		status_label.text = ""
+	for wheel in wheels:
+		wheel.rotate_x(city_velocity * delta * 1.7)
 
 func _process(delta: float) -> void:
 	if crashed or not game_started:
+		return
+	if city_mode:
+		var behind := car.position + Vector3(sin(city_heading) * 11.5, 4.7, cos(city_heading) * 11.5)
+		camera.position = camera.position.lerp(behind, minf(delta * 4.5, 1.0))
+		camera.look_at(car.position + Vector3(0, 1.1, 0), Vector3.UP)
+		if city_challenge != null:
+			city_challenge.call("update_car_position", car.position, speed)
+			mission_label.text = str(city_challenge.call("guidance", car.position, city_heading))
+		else:
+			mission_label.text = "FREE DRIVE  |  EXPLORE MANHATTAN"
+		score_label.text = "MANHATTAN  |  %d km/h\nDISTANCE  %dm  |  OSM CONTRIBUTORS" % [int(speed * 3.6), int(distance)]
 		return
 	var target_speed: float = [0.0, 0.0, 0.0][difficulty]
 	if accelerating:
@@ -618,15 +822,6 @@ func _process(delta: float) -> void:
 	camera.position.x = lerp(camera.position.x, car.position.x, min(delta * 3.0, 1.0))
 	for wheel in wheels:
 		wheel.rotate_x(speed * delta * 1.7)
-	if city_mode:
-		city_heading -= steering * delta * (0.45 + speed * 0.025)
-		car.rotation.y = city_heading
-		car.position += Vector3(-sin(city_heading),0,-cos(city_heading)) * speed * delta
-		var behind := car.position + Vector3(sin(city_heading)*11.5,4.7,cos(city_heading)*11.5)
-		camera.position = camera.position.lerp(behind,minf(delta*4.0,1.0))
-		camera.look_at(car.position + Vector3(0,1.1,0),Vector3.UP)
-		score_label.text = "MANHATTAN | %dm | %d km/h\nMap: © OpenStreetMap contributors (ODbL)" % [int(distance), int(speed * 3.6)]
-		return
 	for marker in lane_marks:
 		marker.position.z += speed * delta
 		if marker.position.z > 14.0:
