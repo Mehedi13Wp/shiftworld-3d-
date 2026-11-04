@@ -797,6 +797,24 @@ func _create_ui() -> void:
 	gear_button.add_theme_font_size_override("font_size", 22)
 	gear_button.visible = false
 	gear_button.pressed.connect(_toggle_gear)
+	road_reset_button = _hud_button(ui, "BACK TO ROAD", Vector2(1, 1), Vector2(-355, -210), Vector2(177, 62))
+	road_reset_button.add_theme_font_size_override("font_size", 17)
+	road_reset_button.visible = false
+	road_reset_button.pressed.connect(_recover_to_road)
+	var minimap_script := load("res://scripts/city_minimap.gd") as Script
+	if minimap_script != null:
+		city_minimap = Control.new()
+		city_minimap.set_script(minimap_script)
+		city_minimap.anchor_left = 1.0
+		city_minimap.anchor_right = 1.0
+		city_minimap.offset_left = -228.0
+		city_minimap.offset_right = -24.0
+		city_minimap.offset_top = 152.0
+		city_minimap.offset_bottom = 352.0
+		city_minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		city_minimap.clip_contents = true
+		city_minimap.visible = false
+		ui.add_child(city_minimap)
 
 	menu_panel = PanelContainer.new()
 	menu_panel.anchor_left = 0.5
@@ -805,8 +823,8 @@ func _create_ui() -> void:
 	menu_panel.anchor_bottom = 0.5
 	menu_panel.offset_left = -272
 	menu_panel.offset_right = 272
-	menu_panel.offset_top = -267
-	menu_panel.offset_bottom = 267
+	menu_panel.offset_top = -194
+	menu_panel.offset_bottom = 194
 	var menu_style := StyleBoxFlat.new()
 	menu_style.bg_color = Color(0.04, 0.075, 0.12, 0.96)
 	menu_style.border_color = Color(0.13, 0.84, 0.82, 0.9)
@@ -827,25 +845,26 @@ func _create_ui() -> void:
 	heading.add_theme_font_size_override("font_size", 30)
 	heading.add_theme_color_override("font_color", Color(0.18, 0.98, 0.86))
 	menu.add_child(heading)
+	var city_available := FileAccess.file_exists("res://data/cities/manhattan.json")
 	var city_button := Button.new()
-	city_button.text = "MANHATTAN  |  CHECKPOINT RUN"
-	city_button.disabled = not FileAccess.file_exists("res://data/cities/manhattan.json")
-	city_button.custom_minimum_size = Vector2(480, 86)
-	city_button.add_theme_font_size_override("font_size", 22)
+	city_button.text = "MANHATTAN  -  FREE DRIVE"
+	city_button.disabled = not city_available
+	city_button.custom_minimum_size = Vector2(480, 90)
+	city_button.add_theme_font_size_override("font_size", 24)
 	menu.add_child(city_button)
-	city_button.pressed.connect(_start_city_mode)
+	city_button.pressed.connect(_start_city_mode.bind(false))
+	var mission_button := Button.new()
+	mission_button.text = "MANHATTAN  -  CHECKPOINTS"
+	mission_button.disabled = not city_available
+	mission_button.custom_minimum_size = Vector2(480, 90)
+	mission_button.add_theme_font_size_override("font_size", 24)
+	menu.add_child(mission_button)
+	mission_button.pressed.connect(_start_city_mode.bind(true))
 	var caption := Label.new()
-	caption.text = "FREE DRIVE / LEGACY HIGHWAY"
+	caption.text = "SAME OPEN WORLD  |  DRIVE OR PLAY MISSIONS"
 	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	caption.add_theme_font_size_override("font_size", 17)
 	menu.add_child(caption)
-	for i in range(3):
-		var mode_button := Button.new()
-		mode_button.text = ["NORMAL", "MEDIUM", "HARD"][i]
-		mode_button.custom_minimum_size = Vector2(480, 62)
-		mode_button.add_theme_font_size_override("font_size", 24)
-		menu.add_child(mode_button)
-		mode_button.pressed.connect(_choose_mode.bind(i))
 
 func _physics_process(delta: float) -> void:
 	if not city_mode or not game_started or crashed:
