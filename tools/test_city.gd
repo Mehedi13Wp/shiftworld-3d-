@@ -65,8 +65,40 @@ func _run() -> void:
 	if new_city.get_node_or_null("OfflineCity/NearbyBuildingCollision") == null:
 		_fail("Building physics mesh missing")
 		return
+	var minimap: Control = game.get("city_minimap") as Control
+	if minimap == null or not minimap.visible:
+		_fail("Manhattan minimap is missing")
+		return
+	var reset_button: Button = game.get("road_reset_button") as Button
+	if reset_button == null or not reset_button.visible:
+		_fail("Road recovery button is missing")
+		return
+	var map_data: Dictionary = game.get("city_map_data")
+	if map_data.get("roads", []).size() < 50:
+		_fail("Map data missing")
+		return
+	var menu: PanelContainer = game.get("menu_panel") as PanelContainer
+	var seen_free := false
+	var seen_mission := false
+	for control in menu.find_children("*", "Button", true, false):
+		var menu_button := control as Button
+		if menu_button.text.contains("FREE DRIVE"):
+			seen_free = true
+		if menu_button.text.contains("CHECKPOINTS"):
+			seen_mission = true
+	if not seen_free or not seen_mission:
+		_fail("Unified city free-drive and mission choices are missing")
+		return
+	player.position = Vector3(1100.0, 0.67, 1100.0)
+	game.call("_recover_to_road")
+	if Vector2(player.position.x, player.position.z).distance_to(Vector2(1100.0, 1100.0)) < 100.0:
+		_fail("Back to Road did not recover the vehicle from outside Manhattan")
+		return
+	if absf(float(game.get("city_velocity"))) > 0.01:
+		_fail("Back to Road did not stop the car")
+		return
 	print("MANHATTAN_RENDER_TEST: PASS | windows: ", windows, " | batched meshes: ", world.get_child_count())
-	print("SHIFTWORLD_DRIVE_V2_TEST: PASS | checkpoints: ", goals.size(), " | physics car + city collision + landscape HUD")
+	print("SHIFTWORLD_DRIVE_V3_TEST: PASS | unified Manhattan modes, minimap, road recovery, checkpoints: ", goals.size())
 	quit(0)
 
 func _fail(message: String) -> void:
