@@ -1,0 +1,40 @@
+name: Build Free Manhattan City Data
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/openworld-stage1]
+    paths:
+      - tools/build_city_map.py
+      - .github/workflows/build-city-map.yml
+permissions:
+  contents: write
+jobs:
+  build-map:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/openworld-stage1
+      - name: Fetch Manhattan OSM roads and buildings
+        run: python3 tools/build_city_map.py manhattan
+      - name: Validate city data
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('data/cities/manhattan.json')
+          d=json.loads(p.read_text())
+          assert len(d['roads']) > 10, 'Too few road segments'
+          assert len(d['buildings']) > 10, 'Too few buildings'
+          print('Validated:',len(d['roads']),'roads,',len(d['buildings']),'buildings')
+          PY
+      - name: Commit offline city map to branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/cities/manhattan.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Add verified offline Manhattan OpenStreetMap city data"
+            git push origin HEAD:feature/openworld-stage1
+          fi
