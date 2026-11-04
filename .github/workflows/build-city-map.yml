@@ -6,6 +6,8 @@ on:
     paths:
       - tools/build_city_map.py
       - .github/workflows/build-city-map.yml
+      - scripts/city_world.gd
+      - scripts/game.gd
 permissions:
   contents: write
 jobs:
@@ -17,7 +19,13 @@ jobs:
         with:
           ref: feature/openworld-stage1
       - name: Fetch Manhattan OSM roads and buildings
-        run: python3 tools/build_city_map.py manhattan
+        run: |
+          for attempt in 1 2 3; do
+            if python3 tools/build_city_map.py manhattan; then exit 0; fi
+            echo "OSM fetch failed (attempt $attempt); retrying..."
+            sleep 20
+          done
+          exit 1
       - name: Validate city data
         run: |
           python3 - <<'PY'
