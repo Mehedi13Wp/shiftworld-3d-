@@ -52,6 +52,8 @@ func load_city(city_id: String) -> bool:
 	var road_st := SurfaceTool.new()
 	var sidewalk_st := SurfaceTool.new()
 	var lane_st := SurfaceTool.new()
+	var crossings := SurfaceTool.new()
+	crossings.begin(Mesh.PRIMITIVE_TRIANGLES)
 	road_st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	sidewalk_st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	lane_st.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -62,9 +64,12 @@ func load_city(city_id: String) -> bool:
 			var a := Vector2(float(pts[i][0]), float(pts[i][1]))
 			var b := Vector2(float(pts[i + 1][0]), float(pts[i + 1][1]))
 			_add_road(road_st, sidewalk_st, lane_st, a, b, road_type)
+			if i == 0 and str(road.get("name", "")) != "":
+				_add_crosswalk(crossings, a, b, road_type)
 	_commit(road_st, road_material, "Roads")
 	_commit(sidewalk_st, sidewalk_material, "Sidewalks")
 	_commit(lane_st, lane_material, "LaneMarks")
+	_commit(crossings, _mat(Color(0.90, 0.93, 0.91)), "ZebraCrosswalks")
 	# Batch buildings by facade color to avoid thousands of individual draw calls.
 	var walls: Array[SurfaceTool] = []
 	for i in range(wall_materials.size()):
@@ -167,6 +172,20 @@ func _add_road(roads: SurfaceTool, sidewalks: SurfaceTool, lanes: SurfaceTool, a
 			var start := a + direction * (float(i) * 9.0 + 2.0)
 			var finish := start + direction * minf(3.0, length - float(i) * 9.0 - 2.0)
 			_strip(lanes, start, finish, normal, 0.085, 0.065)
+
+func _add_crosswalk(st: SurfaceTool, a: Vector2, b: Vector2, road_type: String) -> void:
+	if a.length_squared() > 380.0 * 380.0 or road_type == "service":
+		return
+	var delta := b - a
+	var length := delta.length()
+	if length < 13.0:
+		return
+	var direction := delta / length
+	var normal := Vector2(-direction.y, direction.x)
+	var width := 9.0 if road_type in ["primary", "secondary", "trunk"] else 6.0
+	for i in range(6):
+		var center := a + direction * (2.7 + float(i) * 0.86)
+		_strip(st, center - direction * 0.25, center + direction * 0.25, normal, width * 0.43, 0.073)
 
 func _strip(st: SurfaceTool, a: Vector2, b: Vector2, normal: Vector2, half_width: float, y: float) -> void:
 	var off := normal * half_width
