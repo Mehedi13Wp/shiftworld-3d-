@@ -871,14 +871,16 @@ func _physics_process(delta: float) -> void:
 		return
 	var desired := 0.0
 	if accelerating and not braking:
-		desired = -5.5 if reverse_gear else 21.0
+		desired = -5.5 if reverse_gear else 17.0
 	var friction := 2.5 + absf(city_velocity) * 0.18
 	var response := 23.0 if braking else (8.0 if accelerating else friction)
 	city_velocity = move_toward(city_velocity, desired, response * delta)
 	var velocity_magnitude := absf(city_velocity)
+	steering_smoothed = move_toward(steering_smoothed, steering, delta * 4.0)
 	var steering_ratio := minf(velocity_magnitude / 3.5, 1.0)
+	var turn_rate := lerpf(0.92, 0.32, clampf(velocity_magnitude / 20.0, 0.0, 1.0))
 	if velocity_magnitude > 0.1:
-		city_heading -= steering * signf(city_velocity) * steering_ratio * (0.32 + velocity_magnitude * 0.028) * delta
+		city_heading -= steering_smoothed * signf(city_velocity) * steering_ratio * turn_rate * delta
 	car.rotation.y = city_heading
 	var forward := Vector3(-sin(city_heading), 0, -cos(city_heading))
 	var from := car.position
@@ -900,14 +902,29 @@ func _process(delta: float) -> void:
 	if crashed or not game_started:
 		return
 	if city_mode:
+		if recovery_message_time > 0.0:
+			recovery_message_time -= delta
+			if recovery_message_time <= 0.0 and status_label.text == "BACK ON ROAD":
+				status_label.text = ""
 		var behind := car.position + Vector3(sin(city_heading) * 11.5, 4.7, cos(city_heading) * 11.5)
 		camera.position = camera.position.lerp(behind, minf(delta * 4.5, 1.0))
 		camera.look_at(car.position + Vector3(0, 1.1, 0), Vector3.UP)
+		var map_target := Vector3.ZERO
+		var map_target_visible := false
 		if city_challenge != null:
 			city_challenge.call("update_car_position", car.position, speed)
 			mission_label.text = str(city_challenge.call("guidance", car.position, city_heading))
+			var index: int = int(city_challenge.get("active_index"))
+			var targets: Array = city_challenge.get("checkpoints")
+			if bool(city_challenge.get("running")) and index >= 0 and index < targets.size():
+				map_target = targets[index]
+				map_target_visible = true
 		else:
 			mission_label.text = "FREE DRIVE  |  EXPLORE MANHATTAN"
+		minimap_refresh_time -= delta
+		if city_minimap != null and minimap_refresh_time <= 0.0:
+			city_minimap.call("follow", car.position, city_heading, map_target, map_target_visible)
+			minimap_refresh_time = 0.12
 		score_label.text = "MANHATTAN  |  %d km/h\nDISTANCE  %dm" % [int(speed * 3.6), int(distance)]
 		return
 	var target_speed: float = [0.0, 0.0, 0.0][difficulty]
