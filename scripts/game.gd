@@ -144,10 +144,9 @@ func _create_environment() -> void:
 	# Keep shadows off for a stable frame rate on lower-end Android GPUs.
 	sun.shadow_enabled = false
 	add_child(sun)
-	# The legacy endless highway is no longer part of the main menu.
-	# Skip loading dozens of tree assets/meshes before Manhattan starts.
-	return
+	# The legacy endless highway is no longer initialized at startup.
 
+func _create_legacy_highway_geometry() -> void:
 	_box(self, Vector3(0, -0.58, -145), Vector3(100, 0.14, ROAD_LENGTH), Color(0.21, 0.34, 0.19))
 	var asphalt := _box(self, Vector3(0, -0.37, -145), Vector3(16, 0.48, ROAD_LENGTH), Color(0.11, 0.13, 0.16))
 	var road_mat := StandardMaterial3D.new()
