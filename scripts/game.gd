@@ -13,6 +13,7 @@ var camera: Camera3D
 var city_challenge: Node3D
 var mission_label: Label
 var coins_label: Label
+var attribution_label: Label
 var gear_button: Button
 var coins := 0
 var city_velocity := 0.0
@@ -548,6 +549,7 @@ func _start_city_mode() -> void:
 			city_challenge = null
 	mission_label.visible = true
 	coins_label.visible = true
+	attribution_label.visible = true
 	gear_button.visible = true
 	gear_button.text = "GEAR: D"
 	_choose_mode(0)
@@ -666,6 +668,21 @@ func _create_ui() -> void:
 	coins_label.text = "COINS  %d" % coins
 	coins_label.visible = false
 	ui.add_child(coins_label)
+
+	attribution_label = Label.new()
+	attribution_label.anchor_left = 0.5
+	attribution_label.anchor_right = 0.5
+	attribution_label.anchor_top = 1.0
+	attribution_label.anchor_bottom = 1.0
+	attribution_label.offset_left = -260
+	attribution_label.offset_right = 260
+	attribution_label.offset_top = -25
+	attribution_label.offset_bottom = -3
+	attribution_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	attribution_label.text = "Map: © OpenStreetMap contributors (ODbL)"
+	attribution_label.add_theme_font_size_override("font_size", 16)
+	attribution_label.visible = false
+	ui.add_child(attribution_label)
 
 	status_label = Label.new()
 	status_label.anchor_left = 0.5
@@ -812,7 +829,7 @@ func _process(delta: float) -> void:
 			mission_label.text = str(city_challenge.call("guidance", car.position, city_heading))
 		else:
 			mission_label.text = "FREE DRIVE  |  EXPLORE MANHATTAN"
-		score_label.text = "MANHATTAN  |  %d km/h\nDISTANCE  %dm  |  OSM CONTRIBUTORS" % [int(speed * 3.6), int(distance)]
+		score_label.text = "MANHATTAN  |  %d km/h\nDISTANCE  %dm" % [int(speed * 3.6), int(distance)]
 		return
 	var target_speed: float = [0.0, 0.0, 0.0][difficulty]
 	if accelerating:
