@@ -6,6 +6,10 @@ base="https://raw.githubusercontent.com/Hidencod/tge-assets/main/packs"
 fetch_glb() {
   local src="$1" dest="$2" tmp
   tmp="${dest}.part"
+  if [ -s "$dest" ] && [ "$(wc -c < "$dest")" -gt 8000 ]; then
+    echo "Reusing cached asset: $dest"
+    return
+  fi
   echo "Downloading $src"
   curl -fL --retry 3 --connect-timeout 20 "$base/$src" -o "$tmp"
   test "$(wc -c < "$tmp")" -gt 8000 || { echo "Invalid asset: $src"; rm -f "$tmp"; exit 1; }
@@ -18,6 +22,8 @@ fetch_glb "nature-kit/tree-detailed.glb" "assets/nature/tree_detailed.glb"
 fetch_glb "nature-kit/tree-oak.glb" "assets/nature/tree_oak.glb"
 echo "Importing actual car and tree meshes..."
 godot --headless --editor --path . --import
+echo "Testing Manhattan scene + checkpoint gameplay..."
+godot --headless --path . --script res://tools/test_city.gd
 echo "Building Android..."
 godot --headless --path . --export-debug "Android" build/SHIFTWORLD-DEV.apk
 test -s build/SHIFTWORLD-DEV.apk
