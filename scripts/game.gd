@@ -572,7 +572,8 @@ func _create_ui() -> void:
 	heading.add_theme_font_size_override("font_size", 29)
 	menu.add_child(heading)
 	var city_button := Button.new()
-	city_button.text = "NEW YORK / MANHATTAN"
+	city_button.text = "NEW YORK / MANHATTAN" if FileAccess.file_exists("res://data/cities/manhattan.json") else "NEW YORK (MAP DOWNLOAD PENDING)"
+	city_button.disabled = not FileAccess.file_exists("res://data/cities/manhattan.json")
 	city_button.custom_minimum_size = Vector2(430, 75)
 	city_button.add_theme_font_size_override("font_size", 23)
 	menu.add_child(city_button)
@@ -624,7 +625,7 @@ func _process(delta: float) -> void:
 		var behind := car.position + Vector3(sin(city_heading)*8.5,3.8,cos(city_heading)*8.5)
 		camera.position = camera.position.lerp(behind,minf(delta*4.0,1.0))
 		camera.look_at(car.position + Vector3(0,0.7,0),Vector3.UP)
-		score_label.text = "MANHATTAN | DISTANCE: %dm | SPEED: %d km/h" % [int(distance), int(speed * 3.6)]
+		score_label.text = "MANHATTAN | %dm | %d km/h\nMap: © OpenStreetMap contributors (ODbL)" % [int(distance), int(speed * 3.6)]
 		return
 	for marker in lane_marks:
 		marker.position.z += speed * delta
