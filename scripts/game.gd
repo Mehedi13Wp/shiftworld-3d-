@@ -11,6 +11,13 @@ const MIN_SPEED := 0.0
 var car: Node3D
 var camera: Camera3D
 var city_challenge: Node3D
+var city_minimap: Control
+var road_reset_button: Button
+var city_map_data: Dictionary = {}
+var challenge_enabled := false
+var steering_smoothed := 0.0
+var minimap_refresh_time := 0.0
+var recovery_message_time := 0.0
 var mission_label: Label
 var coins_label: Label
 var attribution_label: Label
@@ -477,7 +484,7 @@ func _create_audio() -> void:
 	effect_player.stream = _tone_stream(110.0, 0.48, 0.32)
 	add_child(effect_player)
 
-func _start_city_mode() -> void:
+func _start_city_mode(with_challenge: bool = true) -> void:
 	var path := "res://data/cities/manhattan.json"
 	if not FileAccess.file_exists(path):
 		status_label.text = "MANHATTAN MAP NOT INSTALLED"
@@ -499,6 +506,11 @@ func _start_city_mode() -> void:
 	city_mode = true
 	var file := FileAccess.open(path, FileAccess.READ)
 	var map_data = JSON.parse_string(file.get_as_text())
+	if not (map_data is Dictionary):
+		status_label.text = "CITY DATA INVALID"
+		return
+	city_map_data = map_data
+	challenge_enabled = with_challenge
 	var nearest := INF
 	var chosen_a := Vector3.ZERO
 	var chosen_b := Vector3(0,0,-1)
@@ -520,6 +532,7 @@ func _start_city_mode() -> void:
 	car.position = city_spawn + Vector3(0,0.67,0)
 	car.rotation.y = city_heading
 	city_velocity = 0.0
+	steering_smoothed = 0.0
 	reverse_gear = false
 	camera.position = car.position + Vector3(sin(city_heading)*11.5,4.7,cos(city_heading)*11.5)
 	camera.look_at(car.position+Vector3.UP*1.1,Vector3.UP)
@@ -537,7 +550,7 @@ func _start_city_mode() -> void:
 	for obstacle in obstacles:
 		obstacle.visible = false
 	var challenge_script := load("res://scripts/city_challenge.gd") as Script
-	if challenge_script != null:
+	if with_challenge and challenge_script != null:
 		city_challenge = Node3D.new()
 		city_challenge.set_script(challenge_script)
 		add_child(city_challenge)
@@ -552,6 +565,11 @@ func _start_city_mode() -> void:
 	attribution_label.visible = true
 	gear_button.visible = true
 	gear_button.text = "GEAR: D"
+	road_reset_button.visible = true
+	if city_minimap != null:
+		city_minimap.call("configure", city_map_data)
+		city_minimap.visible = true
+		minimap_refresh_time = 0.0
 	_choose_mode(0)
 
 func _choose_mode(mode: int) -> void:
@@ -592,6 +610,48 @@ func _on_run_completed(reward: int) -> void:
 	coins_label.text = "COINS  %d" % coins
 	status_label.text = "RUN COMPLETE! +%d COINS" % reward
 	_save_progress()
+
+func _recover_to_road() -> void:
+	if not city_mode or city_map_data.is_empty():
+		return
+	var current := Vector2(car.position.x, car.position.z)
+	var nearest_squared := INF
+	var nearest_point := Vector2.ZERO
+	var nearest_direction := Vector2(0.0, -1.0)
+	for road in city_map_data.get("roads", []):
+		if str(road.get("type", "")) == "service":
+			continue
+		var pts: Array = road.get("points", [])
+		for i in range(pts.size() - 1):
+			var a := Vector2(float(pts[i][0]), float(pts[i][1]))
+			var b := Vector2(float(pts[i + 1][0]), float(pts[i + 1][1]))
+			var delta := b - a
+			if delta.length_squared() < 4.0:
+				continue
+			var closest := Geometry2D.get_closest_point_to_segment(current, a, b)
+			var distance_squared := current.distance_squared_to(closest)
+			if distance_squared < nearest_squared:
+				nearest_squared = distance_squared
+				nearest_point = closest
+				nearest_direction = delta.normalized()
+	if nearest_squared == INF:
+		return
+	var facing := Vector2(-sin(city_heading), -cos(city_heading))
+	if facing.dot(nearest_direction) < 0.0:
+		nearest_direction = -nearest_direction
+	city_heading = atan2(-nearest_direction.x, -nearest_direction.y)
+	car.position = Vector3(nearest_point.x, 0.67, nearest_point.y)
+	car.rotation.y = city_heading
+	city_velocity = 0.0
+	speed = 0.0
+	steering = 0.0
+	steering_smoothed = 0.0
+	accelerating = false
+	braking = false
+	reverse_gear = false
+	gear_button.text = "GEAR: D"
+	recovery_message_time = 2.0
+	status_label.text = "BACK ON ROAD"
 
 func _toggle_gear() -> void:
 	if city_mode and absf(city_velocity) < 0.7:
