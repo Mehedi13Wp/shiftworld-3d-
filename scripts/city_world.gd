@@ -28,8 +28,19 @@ func load_city(city_id: String) -> bool:
 			var a := Vector3(float(pts[i][0]),0.02,float(pts[i][1]))
 			var b := Vector3(float(pts[i+1][0]),0.02,float(pts[i+1][1]))
 			_add_road_segment(a,b,str(road.get("type","residential")))
-	for building in data.get("buildings",[]):
-		_add_building(building)
+	# Limit visible geometry for entry-level Android GPUs; nearest buildings first.
+	var buildings: Array = data.get("buildings", [])
+	buildings.sort_custom(func(a, b):
+		var pa: Array = a.get("points", [])
+		var pb: Array = b.get("points", [])
+		if pa.is_empty() or pb.is_empty():
+			return false
+		var da: float = float(pa[0][0]) * float(pa[0][0]) + float(pa[0][1]) * float(pa[0][1])
+		var db: float = float(pb[0][0]) * float(pb[0][0]) + float(pb[0][1]) * float(pb[0][1])
+		return da < db
+	)
+	for i in range(mini(buildings.size(), 550)):
+		_add_building(buildings[i])
 	return true
 
 func _add_ground() -> void:
