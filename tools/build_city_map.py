@@ -16,8 +16,16 @@ def make_map(key):
  bbox=f"{lat-dy:.6f},{lon-dx:.6f},{lat+dy:.6f},{lon+dx:.6f}"
  query=f'[out:json][timeout:90];(way["highway"~"^(motorway|trunk|primary|secondary|tertiary|residential|living_street|service|unclassified)$"]({bbox});way["building"]({bbox}););out geom;'
  body=urllib.parse.urlencode({"data":query}).encode()
- req=urllib.request.Request("https://overpass.kumi.systems/api/interpreter",data=body,headers={"User-Agent":"SHIFTWORLD3D-prototype/0.1 (OpenStreetMap ODbL)","Content-Type":"application/x-www-form-urlencoded"})
- with urllib.request.urlopen(req,timeout=120) as resp: raw=json.load(resp)
+ headers={"User-Agent":"SHIFTWORLD3D-prototype/0.1 (OpenStreetMap ODbL)","Content-Type":"application/x-www-form-urlencoded"}
+ raw=None
+ for endpoint in ("https://overpass.kumi.systems/api/interpreter","https://overpass-api.de/api/interpreter"):
+  try:
+   req=urllib.request.Request(endpoint,data=body,headers=headers)
+   with urllib.request.urlopen(req,timeout=120) as resp: raw=json.load(resp)
+   break
+  except (OSError,ValueError) as exc:
+   print(f"Map endpoint unavailable: {endpoint}: {exc}",file=sys.stderr)
+ if raw is None:raise RuntimeError("All map endpoints unavailable; retry later")
  roads=[]; buildings=[]
  for e in raw.get("elements",[]):
   if e.get("type")!="way" or len(e.get("geometry",[]))<2:continue
