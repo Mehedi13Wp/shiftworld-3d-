@@ -269,7 +269,10 @@ func _create_car() -> void:
 			if model != null:
 				car.add_child(model)
 				# Asset body: tuned after actual GLB import; no procedural car overlays.
-				model.rotation.y = PI
+				model.rotation.y = -PI / 2.0
+				# The imported sports car is built lengthwise on X (nose toward -X).
+				# Rotate its nose toward the highway (-Z), then fit to road scale.
+				_fit_imported_car(model)
 				# Repaint body panels red while preserving glass, rubber and lights.
 				_repaint_supercar(model)
 			else:
@@ -283,6 +286,45 @@ func _create_car() -> void:
 	camera.rotation_degrees.x = -10.0
 	camera.current = true
 	add_child(camera)
+
+func _fit_imported_car(model: Node3D) -> void:
+	# Measure the actual imported geometry, including nested GLB transforms.
+	# Fit its longest horizontal dimension to a 4.4 m vehicle.
+	var bounds := AABB()
+	var found := false
+	var pending: Array[Node] = [model]
+	while not pending.is_empty():
+		var node: Node = pending.pop_back()
+		if node is MeshInstance3D:
+			var mesh_node := node as MeshInstance3D
+			if mesh_node.mesh != null:
+				var mesh_bounds := mesh_node.mesh.get_aabb()
+				var relative := model.global_transform.affine_inverse() * mesh_node.global_transform
+				for xi in range(2):
+					for yi in range(2):
+						for zi in range(2):
+							var corner := mesh_bounds.position + Vector3(mesh_bounds.size.x * float(xi), mesh_bounds.size.y * float(yi), mesh_bounds.size.z * float(zi))
+							var p := relative * corner
+							if not found:
+								bounds = AABB(p, Vector3.ZERO)
+								found = true
+							else:
+								bounds = bounds.expand(p)
+		for child in node.get_children():
+			pending.append(child)
+	if not found:
+		return
+	var longest := maxf(bounds.size.x, bounds.size.z)
+	if longest < 0.01:
+		return
+	var factor := 4.4 / longest
+	model.scale = Vector3.ONE * factor
+	var center := bounds.position + bounds.size * 0.5
+	# Account for the 90-degree Y rotation: model's local X becomes world Z.
+	var offset := Vector3(-center.x, -bounds.position.y, -center.z) * factor
+	model.position = model.basis * offset
+	# Car root is at y=0.67, place wheels near ground instead of floating.
+	model.position.y -= 0.62
 
 func _repaint_supercar(root: Node) -> void:
 	for child in root.get_children():
