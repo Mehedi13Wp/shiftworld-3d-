@@ -2,7 +2,7 @@ name: Build SHIFTWORLD Android APK
 
 on:
   push:
-    branches: [main]
+    branches: [feature/openworld-stage1]
   workflow_dispatch:
 
 jobs:
@@ -73,6 +73,25 @@ jobs:
           keystore/debug_user="androiddebugkey"
           keystore/debug_password="android"
           PRESET
+
+      - name: Check bundled Manhattan map
+        run: |
+          python3 - <<'PY'
+          import json
+          with open("data/cities/manhattan.json") as f:
+              data=json.load(f)
+          assert len(data["roads"]) >= 100
+          assert len(data["buildings"]) >= 100
+          print("Manhattan map verified:",len(data["roads"]),"roads",len(data["buildings"]),"buildings")
+          PY
+
+      - name: Download optional car and nature assets
+        shell: bash
+        run: |
+          mkdir -p assets/vehicles assets/nature
+          curl -fL --retry 2 --max-time 90 "https://raw.githubusercontent.com/JaronKBragg7337/spectral-gt-rs/main/spectral_gt_rs_game_ready.glb" -o assets/vehicles/red_supercar.glb || rm -f assets/vehicles/red_supercar.glb
+          curl -fL --retry 2 --max-time 60 "https://raw.githubusercontent.com/Hidencod/tge-assets/main/packs/nature-kit/tree-detailed.glb" -o assets/nature/tree_detailed.glb || rm -f assets/nature/tree_detailed.glb
+          curl -fL --retry 2 --max-time 60 "https://raw.githubusercontent.com/Hidencod/tge-assets/main/packs/nature-kit/tree-oak.glb" -o assets/nature/tree_oak.glb || rm -f assets/nature/tree_oak.glb
 
       - name: Import game and configure Godot Android SDK
         shell: bash
