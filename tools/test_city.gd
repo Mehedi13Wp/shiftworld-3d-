@@ -24,7 +24,7 @@ func _run() -> void:
 	if world == null:
 		_fail("OfflineCity node is missing")
 		return
-	for node_name in ["Roads", "Sidewalks", "LaneMarks", "BuildingWalls0", "Roofs", "FacadeWindows"]:
+	for node_name in ["Roads", "Sidewalks", "LaneMarks", "ZebraCrosswalks", "BuildingWalls0", "Roofs", "FacadeWindows"]:
 		var node: MeshInstance3D = world.get_node_or_null(node_name) as MeshInstance3D
 		if node == null or node.mesh == null or node.mesh.get_surface_count() == 0:
 			_fail("Missing mesh: " + node_name)
