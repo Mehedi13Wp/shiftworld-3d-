@@ -124,7 +124,7 @@ func _add_road(roads: SurfaceTool, sidewalks: SurfaceTool, lanes: SurfaceTool, a
 	# Sidewalk strips stay outside the road so they do not hide the asphalt.
 	if kind != "service":
 		for side in [-1.0, 1.0]:
-			var offset := normal * side * (width * 0.5 + 0.85)
+			var offset: Vector2 = normal * float(side) * (width * 0.5 + 0.85)
 			_strip(sidewalks, a + offset, b + offset, normal, 0.85, 0.085)
 		var dash_count := int(length / 9.0)
 		for i in range(dash_count):
