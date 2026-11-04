@@ -75,6 +75,8 @@ func load_city(city_id: String) -> bool:
 	roofs.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var glass := SurfaceTool.new()
 	glass.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var collision_walls := SurfaceTool.new()
+	collision_walls.begin(Mesh.PRIMITIVE_TRIANGLES)
 	window_count = 0
 	# OSM ordering is arbitrary. Prioritize buildings around Times Square/spawn.
 	var buildings: Array = data.get("buildings", [])
@@ -93,7 +95,7 @@ func load_city(city_id: String) -> bool:
 	)
 	var count := 0
 	for building in buildings:
-		if _add_building(walls, roofs, glass, building):
+		if _add_building(walls, roofs, glass, collision_walls, building):
 			count += 1
 			if count >= 650:
 				break
@@ -101,6 +103,16 @@ func load_city(city_id: String) -> bool:
 		_commit(walls[i], wall_materials[i], "BuildingWalls" + str(i))
 	_commit(roofs, roof_material, "Roofs")
 	_commit(glass, glass_material, "FacadeWindows")
+	# Static building collision near the playable challenge area.
+	# One combined concave mesh is substantially cheaper than hundreds of bodies.
+	var collision_mesh := collision_walls.commit()
+	if collision_mesh != null and collision_mesh.get_surface_count() > 0:
+		var static_body := StaticBody3D.new()
+		static_body.name = "NearbyBuildingCollision"
+		var collision_shape := CollisionShape3D.new()
+		collision_shape.shape = collision_mesh.create_trimesh_shape()
+		static_body.add_child(collision_shape)
+		city_root.add_child(static_body)
 	return true
 
 func _commit(st: SurfaceTool, material: StandardMaterial3D, node_name: String) -> void:
@@ -201,7 +213,7 @@ func _add_facade_windows(glass: SurfaceTool, a: Vector2, b: Vector2, height: flo
 			_quad(glass, Vector3(left.x,bottom,left.y), Vector3(right.x,bottom,right.y), Vector3(right.x,top,right.y), Vector3(left.x,top,left.y))
 			window_count += 1
 
-func _add_building(walls: Array[SurfaceTool], roofs: SurfaceTool, glass: SurfaceTool, building: Dictionary) -> bool:
+func _add_building(walls: Array[SurfaceTool], roofs: SurfaceTool, glass: SurfaceTool, collision_walls: SurfaceTool, building: Dictionary) -> bool:
 	var raw: Array = building.get("points", [])
 	if raw.size() < 4:
 		return false
@@ -235,6 +247,7 @@ func _add_building(walls: Array[SurfaceTool], roofs: SurfaceTool, glass: Surface
 	var facade_area := _polygon_area(outline)
 	var building_center := Vector2((min_x + max_x) * 0.5, (min_z + max_z) * 0.5)
 	var show_windows := building_center.length_squared() < 550.0 * 550.0
+	var needs_collision := building_center.length_squared() < 320.0 * 320.0
 	var distance_to_center := building_center.length()
 	var window_budget := 60 if distance_to_center < 200.0 else (40 if distance_to_center < 350.0 else 20)
 	var per_wall_budget := maxi(1, int(ceil(float(window_budget) / float(outline.size()))))
@@ -242,6 +255,8 @@ func _add_building(walls: Array[SurfaceTool], roofs: SurfaceTool, glass: Surface
 		var a := outline[i]
 		var b := outline[(i+1) % outline.size()]
 		_quad(facade, Vector3(a.x,0,a.y), Vector3(b.x,0,b.y), Vector3(b.x,height,b.y), Vector3(a.x,height,a.y))
+		if needs_collision:
+			_quad(collision_walls, Vector3(a.x,0,a.y), Vector3(b.x,0,b.y), Vector3(b.x,height,b.y), Vector3(a.x,height,a.y))
 		if show_windows:
 			_add_facade_windows(glass, a, b, height, facade_area, per_wall_budget)
 	for i in range(0,indices.size(),3):
