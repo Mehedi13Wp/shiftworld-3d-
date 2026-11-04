@@ -65,12 +65,9 @@ var traffic_colors := [Color(0.64, 0.07, 0.08), Color(0.12, 0.23, 0.35), Color(0
 func _ready() -> void:
 	_load_progress()
 	_create_environment()
-	_roadside_details()
 	_create_car()
 	_create_ui()
 	_create_audio()
-	_spawn_obstacles()
-	_create_service_area()
 
 func _material(color: Color) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
@@ -147,6 +144,9 @@ func _create_environment() -> void:
 	# Keep shadows off for a stable frame rate on lower-end Android GPUs.
 	sun.shadow_enabled = false
 	add_child(sun)
+	# The legacy endless highway is no longer part of the main menu.
+	# Skip loading dozens of tree assets/meshes before Manhattan starts.
+	return
 
 	_box(self, Vector3(0, -0.58, -145), Vector3(100, 0.14, ROAD_LENGTH), Color(0.21, 0.34, 0.19))
 	var asphalt := _box(self, Vector3(0, -0.37, -145), Vector3(16, 0.48, ROAD_LENGTH), Color(0.11, 0.13, 0.16))
