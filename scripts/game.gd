@@ -36,6 +36,8 @@ var menu_panel: PanelContainer
 var city_mode := false
 var city_world: Node3D
 var city_data_ready := false
+var city_heading := 0.0
+var city_spawn := Vector3.ZERO
 var car_paint := Color(0.82, 0.025, 0.035)
 const SUPERCAR_MODEL_PATH := "res://assets/vehicles/red_supercar.glb"
 const TREE_MODEL_PATH := "res://assets/nature/tree_detailed.glb"
@@ -475,6 +477,28 @@ func _start_city_mode() -> void:
 		return
 	city_data_ready = true
 	city_mode = true
+	var file := FileAccess.open(path, FileAccess.READ)
+	var map_data = JSON.parse_string(file.get_as_text())
+	var nearest := INF
+	var chosen_a := Vector3.ZERO
+	var chosen_b := Vector3(0,0,-1)
+	for road in map_data.get("roads", []):
+		var pts: Array = road.get("points", [])
+		for i in range(pts.size()-1):
+			var a := Vector3(float(pts[i][0]), 0.0, float(pts[i][1]))
+			var b := Vector3(float(pts[i+1][0]), 0.0, float(pts[i+1][1]))
+			var d := (a+b).length_squared()
+			if d < nearest and a.distance_to(b) > 5.0:
+				nearest = d
+				chosen_a = a
+				chosen_b = b
+	city_spawn = (chosen_a + chosen_b)*0.5
+	var direction := (chosen_b-chosen_a).normalized()
+	city_heading = atan2(-direction.x,-direction.z)
+	car.position = city_spawn + Vector3(0,0.67,0)
+	car.rotation.y = city_heading
+	camera.position = car.position + Vector3(-sin(city_heading)*8.0,3.7,cos(city_heading)*8.0)
+	camera.look_at(car.position+Vector3.UP*0.5,Vector3.UP)
 	# City center map coordinates start at zero; the player stays at a local origin.
 	# Hide legacy highway meshes, but keep player, camera, UI and audio.
 	for child in get_children():
@@ -587,16 +611,19 @@ func _process(delta: float) -> void:
 	speed = move_toward(speed, target_speed, (24.0 if braking else 9.0) * delta)
 	distance += speed * delta
 	# This milestone still uses scrolling scenery; full world-space driving comes next.
-	car.position.x = clamp(car.position.x + steering * (1.65 + speed * 0.08) * delta, 1.1, 6.9)
+	if not city_mode:
+		car.position.x = clamp(car.position.x + steering * (1.65 + speed * 0.08) * delta, 1.1, 6.9)
 	car.rotation.z = lerp(car.rotation.z, -steering * 0.045, min(delta * 6.0, 1.0))
 	camera.position.x = lerp(camera.position.x, car.position.x, min(delta * 3.0, 1.0))
 	for wheel in wheels:
 		wheel.rotate_x(speed * delta * 1.7)
 	if city_mode:
-		car.position.z -= speed * delta
-		camera.position.z = car.position.z + 8.0
-		camera.look_at(car.position + Vector3(0, 0.6, -5.0), Vector3.UP)
-		camera.position.x = lerp(camera.position.x, car.position.x, min(delta * 3.0, 1.0))
+		city_heading += steering * delta * (0.45 + speed * 0.025)
+		car.rotation.y = city_heading
+		car.position += Vector3(-sin(city_heading),0,-cos(city_heading)) * speed * delta
+		var behind := car.position + Vector3(sin(city_heading)*8.5,3.8,cos(city_heading)*8.5)
+		camera.position = camera.position.lerp(behind,minf(delta*4.0,1.0))
+		camera.look_at(car.position + Vector3(0,0.7,0),Vector3.UP)
 		score_label.text = "MANHATTAN | DISTANCE: %dm | SPEED: %d km/h" % [int(distance), int(speed * 3.6)]
 		return
 	for marker in lane_marks:
