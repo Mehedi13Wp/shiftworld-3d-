@@ -141,7 +141,8 @@ func build(data: Dictionary) -> void:
 	var vines := SurfaceTool.new()
 	var lotuses := SurfaceTool.new()
 	var lotus_centers := SurfaceTool.new()
-	for st in [water, banks, lilypads, vines, lotuses, lotus_centers]:
+	var shore_reeds := SurfaceTool.new()
+	for st in [water, banks, lilypads, vines, lotuses, lotus_centers, shore_reeds]:
 		st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	# Seeded randomness keeps the same plants at the same map coordinates.
 	var rng := RandomNumberGenerator.new()
@@ -170,6 +171,15 @@ func build(data: Dictionary) -> void:
 				var outer_a := p + Vector2(cos(a), sin(a)) * radius
 				var outer_b := p + Vector2(cos(b), sin(b)) * radius
 				_quad(banks, _v(inner_a, WATER_HEIGHT + 0.015), _v(inner_b, WATER_HEIGHT + 0.015), _v(outer_b, WATER_HEIGHT + 0.095), _v(outer_a, WATER_HEIGHT + 0.095))
+			# Upright wetland grasses make the bank visible from a driving camera.
+			if (ix + iz) % 4 == 1:
+				for blade in range(4):
+					var angle := rng.randf() * TAU
+					var stalk := p + Vector2(cos(angle), sin(angle)) * (radius - 2.8)
+					var height := rng.randf_range(0.9, 2.5)
+					var stalk_left := stalk + Vector2(-0.11, 0)
+					var stalk_right := stalk + Vector2(0.11, 0)
+					_quad(shore_reeds, _v(stalk_left, WATER_HEIGHT + 0.08), _v(stalk_right, WATER_HEIGHT + 0.08), _v(stalk_right, height), _v(stalk_left, height))
 			# Put decorative plants in a controlled fraction of patches for mobile FPS.
 			if (ix + iz) % 3 != 0:
 				continue
@@ -194,6 +204,7 @@ func build(data: Dictionary) -> void:
 	_commit(vines, "WaterSpinachVines", _mat(Color(0.20, 0.55, 0.21)))
 	_commit(lotuses, "PinkLotusFlowers", _mat(Color(0.96, 0.39, 0.62)))
 	_commit(lotus_centers, "LotusCenters", _mat(Color(0.99, 0.84, 0.18)))
+	_commit(shore_reeds, "WetlandReeds", _mat(Color(0.31, 0.51, 0.22)))
 
 func is_in_water(world: Vector3) -> bool:
 	var p := Vector2(world.x, world.z)
