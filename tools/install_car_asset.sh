@@ -18,6 +18,8 @@ fetch_glb() {
 # Kenney Car Kit is CC0. sedan-sports is a closed-body street car with wheels.
 echo "Downloading CC0 Kenney Sedan Sports (city street-car model)"
 fetch_glb "car-kit/sedan-sports.glb" "assets/vehicles/sedan_sports.glb"
+fetch_glb "car-kit/sedan.glb" "assets/vehicles/sedan_city.glb"
+fetch_glb "car-kit/suv.glb" "assets/vehicles/suv_city.glb"
 fetch_glb "nature-kit/tree-detailed.glb" "assets/nature/tree_detailed.glb"
 fetch_glb "nature-kit/tree-oak.glb" "assets/nature/tree_oak.glb"
 echo "Importing actual car and tree meshes..."
