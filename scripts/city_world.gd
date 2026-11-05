@@ -41,7 +41,8 @@ func _setup_materials() -> void:
 	sidewalk_material = _mat(Color(0.52, 0.53, 0.52))
 	lane_material = _mat(Color(0.92, 0.89, 0.72))
 	roof_material = _mat(Color(0.38, 0.40, 0.43))
-	ground_material = _mat(Color(0.25, 0.34, 0.27))
+	# Times Square is urban, not a giant grassy field between road meshes.
+	ground_material = _mat(Color(0.33, 0.34, 0.33))
 	glass_material = _mat(Color(0.12, 0.21, 0.29))
 	glass_material.metallic = 0.18
 	glass_material.roughness = 0.30
