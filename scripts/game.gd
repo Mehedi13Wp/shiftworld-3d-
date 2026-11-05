@@ -66,11 +66,11 @@ var city_heading := 0.0
 var city_spawn := Vector3.ZERO
 var car_paint := Color(0.82, 0.025, 0.035)
 const CAR_MODELS := [
-	"res://assets/vehicles/sedan_sports.glb",
 	"res://assets/vehicles/sedan_city.glb",
+	"res://assets/vehicles/sedan_sports.glb",
 	"res://assets/vehicles/suv_city.glb"
 ]
-const CAR_NAMES := ["SPORT SEDAN", "CITY SEDAN", "URBAN SUV"]
+const CAR_NAMES := ["CITY SEDAN", "SPORT SEDAN", "URBAN SUV"]
 const CAR_PRICES := [0, 350, 800]
 const TREE_MODEL_PATH := "res://assets/nature/tree_detailed.glb"
 const OAK_MODEL_PATH := "res://assets/nature/tree_oak.glb"
