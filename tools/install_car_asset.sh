@@ -15,6 +15,27 @@ fetch_glb() {
   test "$(wc -c < "$tmp")" -gt 8000 || { echo "Invalid asset: $src"; rm -f "$tmp"; exit 1; }
   mv -f "$tmp" "$dest"
 }
+# Optional higher-detail real-scale CC0 vehicle models from Innerscene.
+# Failure is non-fatal: verified Kenney CC0 cars are the offline fallback.
+fetch_real_car_optional() {
+  local src="$1" dest="$2" tmp
+  tmp="${dest}.real.part"
+  if [ -s "$dest" ] && [ "$(wc -c < "$dest")" -gt 8000 ]; then
+    return
+  fi
+  echo "Trying realistic CC0 car: $dest"
+  if curl -fL --retry 2 --connect-timeout 15 --max-time 45 "$src" -o "$tmp" \
+      && [ "$(wc -c < "$tmp")" -gt 300000 ] \
+      && [ "$(head -c 4 "$tmp")" = "glTF" ]; then
+    mv -f "$tmp" "$dest"
+    echo "Realistic GLB installed: $dest"
+  else
+    rm -f "$tmp"
+    echo "Realistic GLB unavailable; using Kenney fallback instead."
+  fi
+}
+fetch_real_car_optional "https://www.innerscene.com/api/library/sedan-car-42109739/download" "assets/vehicles/sedan_city.glb"
+fetch_real_car_optional "https://www.innerscene.com/api/library/suv-dc972cab/download" "assets/vehicles/suv_city.glb"
 # Kenney Car Kit is CC0. sedan-sports is a closed-body street car with wheels.
 echo "Downloading CC0 Kenney Sedan Sports (city street-car model)"
 fetch_glb "car-kit/sedan-sports.glb" "assets/vehicles/sedan_sports.glb"
