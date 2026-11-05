@@ -27,6 +27,7 @@ var garage_panel: PanelContainer
 var garage_title: Label
 var garage_buttons: Array[Button] = []
 var car_visual: Node3D
+var car_collider: CollisionShape3D
 var selected_car := 0
 var owned_cars: Array[int] = [0]
 var total_distance := 0.0
@@ -308,6 +309,7 @@ func _create_car() -> void:
 	shape.size = Vector3(1.75, 1.05, 3.95)
 	collider.shape = shape
 	car.add_child(collider)
+	car_collider = collider
 	_apply_car_visual()
 	camera = Camera3D.new()
 	camera.position = Vector3(2.0, 3.7, 12.0)
@@ -324,6 +326,14 @@ func _apply_car_visual() -> void:
 	car_visual = Node3D.new()
 	car_visual.name = "VehicleVisual"
 	car.add_child(car_visual)
+	if car_collider != null:
+		var body_box := car_collider.shape as BoxShape3D
+		if body_box != null:
+			body_box.size = [
+				Vector3(1.90, 1.10, 4.25),
+				Vector3(1.82, 1.04, 4.18),
+				Vector3(2.05, 1.40, 4.55)
+			][clampi(selected_car, 0, 2)]
 	wheels.clear()
 	var model_path := str(CAR_MODELS[clampi(selected_car, 0, CAR_MODELS.size() - 1)])
 	var scene: PackedScene = null
