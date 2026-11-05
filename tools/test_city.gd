@@ -24,7 +24,7 @@ func _run() -> void:
 	if world == null:
 		_fail("OfflineCity node is missing")
 		return
-	for node_name in ["Roads", "Sidewalks", "LaneMarks", "ZebraCrosswalks", "BuildingWalls0", "Roofs", "FacadeWindows"]:
+	for node_name in ["Roads", "Sidewalks", "LaneMarks", "RoadCurbs", "ZebraCrosswalks", "BuildingWalls0", "Roofs", "FacadeWindows", "GroundFloorShopWindows", "StorefrontSignBands"]:
 		var node: MeshInstance3D = world.get_node_or_null(node_name) as MeshInstance3D
 		if node == null or node.mesh == null or node.mesh.get_surface_count() == 0:
 			_fail("Missing mesh: " + node_name)
@@ -33,6 +33,9 @@ func _run() -> void:
 	if windows < 100:
 		_fail("Expected at least 100 generated facade windows, got " + str(windows))
 		return
+	if world.get_node_or_null("StreetDetails/StreetlampPoles") == null:
+		_fail("Streetlight detail mesh missing")
+		return
 	# Exercise the actual main scene and the button's city-mode startup,
 	# not only an isolated renderer.
 	var scene: PackedScene = load("res://scenes/main.tscn") as PackedScene
@@ -40,6 +43,7 @@ func _run() -> void:
 		_fail("Main scene not available")
 		return
 	var game: Node3D = scene.instantiate() as Node3D
+	game.set("test_no_save", true)
 	root.add_child(game)
 	game.call("_start_city_mode")
 	if not bool(game.get("city_mode")):
@@ -97,8 +101,36 @@ func _run() -> void:
 	if absf(float(game.get("city_velocity"))) > 0.01:
 		_fail("Back to Road did not stop the car")
 		return
+	var garage_panel: PanelContainer = game.get("garage_panel") as PanelContainer
+	if garage_panel == null:
+		_fail("Garage panel did not initialize")
+		return
+	var garage_buttons: Array = game.get("garage_buttons")
+	if garage_buttons.size() != 3:
+		_fail("Garage must offer 3 vehicles")
+		return
+	var starting_coins := int(game.get("coins"))
+	for _i in range(250):
+		game.call("_distance_reward", 1.0)
+	if int(game.get("coins")) != starting_coins + 50:
+		_fail("250m distance must award exactly 50 coins")
+		return
+	game.set("coins", 2000)
+	game.call("_choose_garage_car", 2)
+	if int(game.get("selected_car")) != 2:
+		_fail("SUV garage selection failed")
+		return
+	var purchased: Array = game.get("owned_cars")
+	if not purchased.has(2):
+		_fail("SUV garage unlock was not retained")
+		return
+	var model: Node3D = game.get("car_visual") as Node3D
+	if model == null or not is_instance_valid(model):
+		_fail("Garage did not replace car visual")
+		return
+	print("SHIFTWORLD_GARAGE_TEST: PASS | 3 cars, SUV selected, 250m=50 coins, save isolated")
 	print("MANHATTAN_RENDER_TEST: PASS | windows: ", windows, " | batched meshes: ", world.get_child_count())
-	print("SHIFTWORLD_DRIVE_V3_TEST: PASS | unified Manhattan modes, minimap, road recovery, checkpoints: ", goals.size())
+	print("SHIFTWORLD_DRIVE_V4_TEST: PASS | road realism, garage, distance rewards, minimap, checkpoints: ", goals.size())
 	quit(0)
 
 func _fail(message: String) -> void:
