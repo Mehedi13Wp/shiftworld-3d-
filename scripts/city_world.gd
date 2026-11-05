@@ -34,8 +34,9 @@ func _setup_materials() -> void:
 	tones.set_color(1, Color(0.235, 0.245, 0.255))
 	asphalt_texture.color_ramp = tones
 	road_material.albedo_texture = asphalt_texture
-	road_material.uv1_triplanar = true
-	road_material.uv1_scale = Vector3(0.12, 0.12, 0.12)
+	# Real XY-on-ground UVs use one texture sample, faster than triplanar on Android.
+	road_material.uv1_triplanar = false
+	road_material.uv1_scale = Vector3.ONE
 	road_material.roughness = 0.97
 	sidewalk_material = _mat(Color(0.52, 0.53, 0.52))
 	lane_material = _mat(Color(0.92, 0.89, 0.72))
@@ -194,7 +195,7 @@ func _add_road(roads: SurfaceTool, sidewalks: SurfaceTool, lanes: SurfaceTool, c
 	var width := 9.0 if kind in ["primary","secondary","trunk"] else 6.0
 	if kind == "service":
 		width = 4.0
-	_strip(roads, a, b, normal, width * 0.5, 0.03)
+	_road_surface(roads, a, b, normal, width * 0.5, 0.03)
 	# Sidewalk strips stay outside the road so they do not hide the asphalt.
 	if kind != "service":
 		for side in [-1.0, 1.0]:
@@ -221,6 +222,20 @@ func _add_crosswalk(st: SurfaceTool, a: Vector2, b: Vector2, road_type: String) 
 	for i in range(6):
 		var center := a + direction * (2.7 + float(i) * 0.86)
 		_strip(st, center - direction * 0.25, center + direction * 0.25, normal, width * 0.43, 0.073)
+
+func _road_surface(st: SurfaceTool, a: Vector2, b: Vector2, normal: Vector2, half_width: float, y: float) -> void:
+	var off := normal * half_width
+	var corners: Array[Vector3] = [
+		Vector3(a.x-off.x, y, a.y-off.y),
+		Vector3(b.x-off.x, y, b.y-off.y),
+		Vector3(b.x+off.x, y, b.y+off.y),
+		Vector3(a.x+off.x, y, a.y+off.y)
+	]
+	for index in [0, 1, 2, 0, 2, 3, 2, 1, 0, 3, 2, 0]:
+		var point: Vector3 = corners[index]
+		st.set_normal(Vector3.UP)
+		st.set_uv(Vector2(point.x, point.z) * 0.22)
+		st.add_vertex(point)
 
 func _strip(st: SurfaceTool, a: Vector2, b: Vector2, normal: Vector2, half_width: float, y: float) -> void:
 	var off := normal * half_width
