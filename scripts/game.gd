@@ -65,6 +65,8 @@ var music_button: Button
 var sound_button: Button
 var menu_panel: PanelContainer
 var city_mode := false
+var active_world_title := "MANHATTAN"
+var scenic_mode := false
 var city_world: Node3D
 var city_data_ready := false
 var city_heading := 0.0
@@ -538,6 +540,8 @@ func _start_city_mode(with_challenge: bool = true) -> void:
 		return
 	city_data_ready = true
 	city_mode = true
+	scenic_mode = false
+	active_world_title = "MANHATTAN"
 	wetland_world = city_world.get_node_or_null("OfflineCity/Wetlands") as Node3D
 	car_in_water = false
 	var file := FileAccess.open(path, FileAccess.READ)
@@ -606,6 +610,49 @@ func _start_city_mode(with_challenge: bool = true) -> void:
 		city_minimap.call("configure", city_map_data)
 		if wetland_world != null:
 			city_minimap.call("set_wetlands", wetland_world.get("ponds"))
+		city_minimap.visible = true
+		minimap_refresh_time = 0.0
+	_choose_mode(0)
+
+func _start_scenic_mode() -> void:
+	# Separate stylized lake road inspired by the selected garden reference.
+	# Existing Manhattan streets and checkpoint missions are not modified.
+	var scenic_script := load("res://scripts/scenic_world.gd") as Script
+	if scenic_script == null:
+		status_label.text = "SCENIC GARDEN NOT INSTALLED"
+		return
+	city_world = Node3D.new()
+	city_world.name = "ScenicWaterGarden"
+	city_world.set_script(scenic_script)
+	add_child(city_world)
+	city_world.call("build")
+	city_mode = true
+	city_data_ready = true
+	scenic_mode = true
+	active_world_title = "SCENIC GARDEN"
+	challenge_enabled = false
+	city_challenge = null
+	wetland_world = city_world
+	car_in_water = false
+	city_map_data = city_world.call("get_map_data")
+	city_spawn = Vector3(0, 0, 20.0)
+	city_heading = 0.0
+	car.position = city_spawn + Vector3.UP * 0.67
+	car.rotation.y = city_heading
+	city_velocity = 0.0
+	steering_smoothed = 0.0
+	reverse_gear = false
+	camera.position = car.position + Vector3(0, 4.7, 11.5)
+	camera.look_at(car.position + Vector3.UP * 1.1, Vector3.UP)
+	mission_label.visible = true
+	coins_label.visible = true
+	attribution_label.visible = false
+	gear_button.visible = true
+	gear_button.text = "GEAR: D"
+	road_reset_button.visible = true
+	if city_minimap != null:
+		city_minimap.call("configure", city_map_data)
+		city_minimap.call("set_wetlands", city_world.call("get_ponds"))
 		city_minimap.visible = true
 		minimap_refresh_time = 0.0
 	_choose_mode(0)
@@ -958,8 +1005,8 @@ func _create_ui() -> void:
 	menu_panel.anchor_bottom = 0.5
 	menu_panel.offset_left = -272
 	menu_panel.offset_right = 272
-	menu_panel.offset_top = -194
-	menu_panel.offset_bottom = 194
+	menu_panel.offset_top = -248
+	menu_panel.offset_bottom = 248
 	var menu_style := StyleBoxFlat.new()
 	menu_style.bg_color = Color(0.04, 0.075, 0.12, 0.96)
 	menu_style.border_color = Color(0.13, 0.84, 0.82, 0.9)
@@ -995,8 +1042,14 @@ func _create_ui() -> void:
 	mission_button.add_theme_font_size_override("font_size", 24)
 	menu.add_child(mission_button)
 	mission_button.pressed.connect(_start_city_mode.bind(true))
+	var garden_button := Button.new()
+	garden_button.text = "SCENIC WATER GARDEN  -  FREE DRIVE"
+	garden_button.custom_minimum_size = Vector2(480, 88)
+	garden_button.add_theme_font_size_override("font_size", 21)
+	menu.add_child(garden_button)
+	garden_button.pressed.connect(_start_scenic_mode)
 	var caption := Label.new()
-	caption.text = "SAME OPEN WORLD  |  DRIVE OR PLAY MISSIONS"
+	caption.text = "MANHATTAN + GARDEN DRIVE  |  GARAGE / COINS"
 	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	caption.add_theme_font_size_override("font_size", 17)
 	menu.add_child(caption)
@@ -1105,13 +1158,13 @@ func _process(delta: float) -> void:
 				map_target = targets[index]
 				map_target_visible = true
 		else:
-			mission_label.text = "FREE DRIVE  |  EXPLORE MANHATTAN"
+			mission_label.text = "LOTUS LAKES  |  ENJOY THE SCENIC ROAD" if scenic_mode else "FREE DRIVE  |  EXPLORE MANHATTAN"
 		minimap_refresh_time -= delta
 		if city_minimap != null and minimap_refresh_time <= 0.0:
 			city_minimap.call("follow", car.position, city_heading, map_target, map_target_visible)
 			minimap_refresh_time = 0.12
 		var remaining := maxi(1, int(ceil(float(last_distance_milestone + 1) * 250.0 - total_distance)))
-		score_label.text = "MANHATTAN  |  %d km/h\nTRIP %dm  |  +50 COINS IN %dm" % [int(speed * 3.6), int(distance), remaining]
+		score_label.text = "%s  |  %d km/h\nTRIP %dm  |  +50 COINS IN %dm" % [active_world_title, int(speed * 3.6), int(distance), remaining]
 		return
 	var target_speed: float = [0.0, 0.0, 0.0][difficulty]
 	if accelerating:
