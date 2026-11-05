@@ -129,13 +129,14 @@ func build() -> void:
 		_strip(paint,-0.11,0.11,z,z-4.0,0.062)
 	# Long parallel lily-pad lakes: visibly adjacent to both sides of the road.
 	for side in [-1.0,1.0]:
-		var a := side*INNER_WATER
-		var c := side*OUTER_WATER
+		var side_value: float = float(side)
+		var a: float = side_value*INNER_WATER
+		var c: float = side_value*OUTER_WATER
 		_strip(water,minf(a,c),maxf(a,c),START_Z,END_Z,WATER_Y)
-		_strip(bank,minf(a,side*(INNER_WATER-3.0)),maxf(a,side*(INNER_WATER-3.0)),START_Z,END_Z,0.061)
-		_strip(bank,minf(c,side*(OUTER_WATER+4.0)),maxf(c,side*(OUTER_WATER+4.0)),START_Z,END_Z,0.055)
+		_strip(bank,minf(a,side_value*(INNER_WATER-3.0)),maxf(a,side*(INNER_WATER-3.0)),START_Z,END_Z,0.061)
+		_strip(bank,minf(c,side_value*(OUTER_WATER+4.0)),maxf(c,side*(OUTER_WATER+4.0)),START_Z,END_Z,0.055)
 		# Raised stone edging between the public road and the planted lake.
-		_strip(stone,minf(side*8.3,side*9.0),maxf(side*8.3,side*9.0),START_Z,END_Z,0.082)
+		_strip(stone,minf(side_value*8.3,side_value*9.0),maxf(side*8.3,side*9.0),START_Z,END_Z,0.082)
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 771204
