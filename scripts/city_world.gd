@@ -143,6 +143,15 @@ func load_city(city_id: String) -> bool:
 		details.set_script(details_script)
 		city_root.add_child(details)
 		details.call("build", data)
+	# Fill off-road vacant terrain with stylized water gardens, without
+	# flooding the OSM street network or building footprint areas.
+	var wetlands_script := load("res://scripts/city_wetlands.gd") as Script
+	if wetlands_script != null:
+		var wetlands := Node3D.new()
+		wetlands.name = "Wetlands"
+		wetlands.set_script(wetlands_script)
+		city_root.add_child(wetlands)
+		wetlands.call("build", data)
 	# Static building collision near the playable challenge area.
 	# One combined concave mesh is substantially cheaper than hundreds of bodies.
 	var collision_mesh := collision_walls.commit()
@@ -180,7 +189,7 @@ func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> v
 func _add_ground() -> void:
 	var ground := MeshInstance3D.new()
 	var plane := PlaneMesh.new()
-	plane.size = Vector2(1800, 1800)
+	plane.size = Vector2(3200, 3200)
 	ground.mesh = plane
 	ground.position.y = -0.12
 	ground.material_override = ground_material
