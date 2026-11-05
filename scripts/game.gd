@@ -11,6 +11,9 @@ const MIN_SPEED := 0.0
 var car: Node3D
 var camera: Camera3D
 var city_challenge: Node3D
+var wetland_world: Node3D
+var car_in_water := false
+var water_fine_entries := 0
 var city_minimap: Control
 var road_reset_button: Button
 var city_map_data: Dictionary = {}
@@ -535,6 +538,8 @@ func _start_city_mode(with_challenge: bool = true) -> void:
 		return
 	city_data_ready = true
 	city_mode = true
+	wetland_world = city_world.get_node_or_null("OfflineCity/Wetlands") as Node3D
+	car_in_water = false
 	var file := FileAccess.open(path, FileAccess.READ)
 	var map_data = JSON.parse_string(file.get_as_text())
 	if not (map_data is Dictionary):
@@ -642,6 +647,22 @@ func _save_progress() -> void:
 	var file := FileAccess.open("user://shiftworld_progress.json", FileAccess.WRITE)
 	if file != null:
 		file.store_string(JSON.stringify({"coins": coins, "total_distance": total_distance, "owned_cars": owned_cars, "selected_car": selected_car}))
+
+func _check_water_fine() -> void:
+	if wetland_world == null or car == null:
+		return
+	var currently_in_water := bool(wetland_world.call("is_in_water", car.position))
+	if currently_in_water and not car_in_water:
+		# Charge exactly once upon entering a new stretch of water.
+		# Coins never go below zero; only the available balance is removed.
+		var paid := mini(50, coins)
+		coins -= paid
+		water_fine_entries += 1
+		coins_label.text = "COINS  %d" % coins
+		status_label.text = "WATER FINE  -%d COINS" % paid
+		recovery_message_time = 3.5
+		_save_progress()
+	car_in_water = currently_in_water
 
 func _distance_reward(travelled: float) -> void:
 	if travelled <= 0.0 or travelled > 5.0:
@@ -758,6 +779,7 @@ func _recover_to_road() -> void:
 	braking = false
 	reverse_gear = false
 	gear_button.text = "GEAR: D"
+	car_in_water = false
 	recovery_message_time = 2.0
 	status_label.text = "BACK ON ROAD"
 
@@ -1045,7 +1067,10 @@ func _physics_process(delta: float) -> void:
 		collision_flash = 1.5
 	var travelled := from.distance_to(car.position)
 	distance += travelled
-	_distance_reward(travelled)
+	_check_water_fine()
+	# Driving through flooded decorative areas must not earn distance coins.
+	if not car_in_water:
+		_distance_reward(travelled)
 	speed = absf(city_velocity)
 	if collision_flash > 0.0:
 		collision_flash -= delta
@@ -1062,7 +1087,7 @@ func _process(delta: float) -> void:
 		if recovery_message_time > 0.0:
 			recovery_message_time -= delta
 			if recovery_message_time <= 0.0:
-				if status_label.text == "BACK ON ROAD" or status_label.text.contains("DISTANCE BONUS") or status_label.text.contains("STOP THE CAR"):
+				if status_label.text == "BACK ON ROAD" or status_label.text.contains("DISTANCE BONUS") or status_label.text.contains("STOP THE CAR") or status_label.text.contains("WATER FINE"):
 					status_label.text = ""
 		var behind := car.position + Vector3(sin(city_heading) * 11.5, 4.7, cos(city_heading) * 11.5)
 		camera.position = camera.position.lerp(behind, minf(delta * 4.5, 1.0))
