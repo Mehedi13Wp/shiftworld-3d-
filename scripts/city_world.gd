@@ -52,6 +52,8 @@ func load_city(city_id: String) -> bool:
 	var road_st := SurfaceTool.new()
 	var sidewalk_st := SurfaceTool.new()
 	var lane_st := SurfaceTool.new()
+	var curb_st := SurfaceTool.new()
+	curb_st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var crossings := SurfaceTool.new()
 	crossings.begin(Mesh.PRIMITIVE_TRIANGLES)
 	road_st.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -63,12 +65,13 @@ func load_city(city_id: String) -> bool:
 		for i in range(pts.size() - 1):
 			var a := Vector2(float(pts[i][0]), float(pts[i][1]))
 			var b := Vector2(float(pts[i + 1][0]), float(pts[i + 1][1]))
-			_add_road(road_st, sidewalk_st, lane_st, a, b, road_type)
+			_add_road(road_st, sidewalk_st, lane_st, curb_st, a, b, road_type)
 			if i == 0 and str(road.get("name", "")) != "":
 				_add_crosswalk(crossings, a, b, road_type)
 	_commit(road_st, road_material, "Roads")
 	_commit(sidewalk_st, sidewalk_material, "Sidewalks")
 	_commit(lane_st, lane_material, "LaneMarks")
+	_commit(curb_st, _mat(Color(0.72, 0.73, 0.71)), "RoadCurbs")
 	_commit(crossings, _mat(Color(0.90, 0.93, 0.91)), "ZebraCrosswalks")
 	# Batch buildings by facade color to avoid thousands of individual draw calls.
 	var walls: Array[SurfaceTool] = []
@@ -108,6 +111,13 @@ func load_city(city_id: String) -> bool:
 		_commit(walls[i], wall_materials[i], "BuildingWalls" + str(i))
 	_commit(roofs, roof_material, "Roofs")
 	_commit(glass, glass_material, "FacadeWindows")
+	var details_script := load("res://scripts/city_decor.gd") as Script
+	if details_script != null:
+		var details := Node3D.new()
+		details.name = "StreetDetails"
+		details.set_script(details_script)
+		city_root.add_child(details)
+		details.call("build", data)
 	# Static building collision near the playable challenge area.
 	# One combined concave mesh is substantially cheaper than hundreds of bodies.
 	var collision_mesh := collision_walls.commit()
@@ -151,7 +161,7 @@ func _add_ground() -> void:
 	ground.material_override = ground_material
 	city_root.add_child(ground)
 
-func _add_road(roads: SurfaceTool, sidewalks: SurfaceTool, lanes: SurfaceTool, a: Vector2, b: Vector2, kind: String) -> void:
+func _add_road(roads: SurfaceTool, sidewalks: SurfaceTool, lanes: SurfaceTool, curbs: SurfaceTool, a: Vector2, b: Vector2, kind: String) -> void:
 	var delta := b - a
 	var length := delta.length()
 	if length < 0.8:
@@ -167,6 +177,8 @@ func _add_road(roads: SurfaceTool, sidewalks: SurfaceTool, lanes: SurfaceTool, a
 		for side in [-1.0, 1.0]:
 			var offset: Vector2 = normal * float(side) * (width * 0.5 + 0.85)
 			_strip(sidewalks, a + offset, b + offset, normal, 0.85, 0.085)
+			var curb_offset: Vector2 = normal * float(side) * (width * 0.5 + 0.08)
+			_strip(curbs, a + curb_offset, b + curb_offset, normal, 0.065, 0.095)
 		var dash_count := int(length / 9.0)
 		for i in range(dash_count):
 			var start := a + direction * (float(i) * 9.0 + 2.0)
