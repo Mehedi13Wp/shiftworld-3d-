@@ -325,7 +325,9 @@ func _apply_car_visual() -> void:
 	car.add_child(car_visual)
 	wheels.clear()
 	var model_path := str(CAR_MODELS[clampi(selected_car, 0, CAR_MODELS.size() - 1)])
-	var scene := load(model_path) as PackedScene if ResourceLoader.exists(model_path) else null
+	var scene: PackedScene = null
+	if ResourceLoader.exists(model_path):
+		scene = load(model_path) as PackedScene
 	if scene != null:
 		var model := scene.instantiate() as Node3D
 		if model != null:
