@@ -22,6 +22,15 @@ var mission_label: Label
 var coins_label: Label
 var attribution_label: Label
 var gear_button: Button
+var garage_button: Button
+var garage_panel: PanelContainer
+var garage_title: Label
+var garage_buttons: Array[Button] = []
+var car_visual: Node3D
+var selected_car := 0
+var owned_cars: Array[int] = [0]
+var total_distance := 0.0
+var last_distance_milestone := 0
 var coins := 0
 var city_velocity := 0.0
 var reverse_gear := false
@@ -56,7 +65,13 @@ var city_data_ready := false
 var city_heading := 0.0
 var city_spawn := Vector3.ZERO
 var car_paint := Color(0.82, 0.025, 0.035)
-const SUPERCAR_MODEL_PATH := "res://assets/vehicles/sedan_sports.glb"
+const CAR_MODELS := [
+	"res://assets/vehicles/sedan_sports.glb",
+	"res://assets/vehicles/sedan_city.glb",
+	"res://assets/vehicles/suv_city.glb"
+]
+const CAR_NAMES := ["SPORT SEDAN", "CITY SEDAN", "URBAN SUV"]
+const CAR_PRICES := [0, 350, 800]
 const TREE_MODEL_PATH := "res://assets/nature/tree_detailed.glb"
 const OAK_MODEL_PATH := "res://assets/nature/tree_oak.glb"
 const ROAD_TEXTURE_PATH := "res://assets/roads/asphalt.jpg"
@@ -292,31 +307,35 @@ func _create_car() -> void:
 	shape.size = Vector3(1.75, 1.05, 3.95)
 	collider.shape = shape
 	car.add_child(collider)
-	# A licensed GLB can replace the procedural preview without changing driving controls.
-	if ResourceLoader.exists(SUPERCAR_MODEL_PATH):
-		var scene := load(SUPERCAR_MODEL_PATH) as PackedScene
-		if scene != null:
-			var model := scene.instantiate() as Node3D
-			if model != null:
-				car.add_child(model)
-				# Asset body: tuned after actual GLB import; no procedural car overlays.
-				model.rotation.y = 0.0
-				# The imported sports car is built lengthwise on X (nose toward -X).
-				# Rotate its nose toward the highway (-Z), then fit to road scale.
-				_fit_imported_car(model)
-				# Repaint body panels red while preserving glass, rubber and lights.
-				# Keep original Kenney body, glass, wheel and trim materials.
-			else:
-				_create_supercar_preview()
-		else:
-			_create_supercar_preview()
-	else:
-		_create_supercar_preview()
+	_apply_car_visual()
 	camera = Camera3D.new()
 	camera.position = Vector3(2.0, 3.7, 12.0)
 	camera.rotation_degrees.x = -10.0
 	camera.current = true
 	add_child(camera)
+
+func _apply_car_visual() -> void:
+	if car == null:
+		return
+	if car_visual != null and is_instance_valid(car_visual):
+		car.remove_child(car_visual)
+		car_visual.queue_free()
+	car_visual = Node3D.new()
+	car_visual.name = "VehicleVisual"
+	car.add_child(car_visual)
+	wheels.clear()
+	var model_path := str(CAR_MODELS[clampi(selected_car, 0, CAR_MODELS.size() - 1)])
+	var scene := load(model_path) as PackedScene if ResourceLoader.exists(model_path) else null
+	if scene != null:
+		var model := scene.instantiate() as Node3D
+		if model != null:
+			car_visual.add_child(model)
+			model.rotation.y = 0.0
+			_fit_imported_car(model)
+			return
+	# Real assets may be absent during headless tests; do not crash the game.
+	car_paint = [Color(0.78,0.06,0.06), Color(0.10,0.25,0.65), Color(0.19,0.22,0.25)][clampi(selected_car, 0, 2)]
+	_create_supercar_preview()
 
 func _fit_imported_car(model: Node3D) -> void:
 	# Measure the actual imported geometry, including nested GLB transforms.
@@ -382,22 +401,22 @@ func _repaint_supercar(root: Node) -> void:
 
 func _create_supercar_preview() -> void:
 	# Temporary low-poly preview; NOT the final licensed photorealistic GLB.
-	_box(car, Vector3(0, -0.17, 0), Vector3(1.96, 0.30, 4.25), car_paint)
-	_box(car, Vector3(0, -0.05, -1.38), Vector3(1.89, 0.13, 1.43), car_paint.lightened(0.06))
-	_box(car, Vector3(0, 0.19, 0.12), Vector3(1.61, 0.40, 1.85), Color(0.065, 0.085, 0.11))
-	_box(car, Vector3(0, 0.41, 0.14), Vector3(1.48, 0.09, 1.48), car_paint)
-	_box(car, Vector3(0, -0.20, -2.14), Vector3(1.67, 0.12, 0.10), Color(0.055, 0.06, 0.07))
-	_box(car, Vector3(0, -0.17, 2.14), Vector3(1.76, 0.15, 0.12), Color(0.055, 0.06, 0.07))
-	_box(car, Vector3(0, 0.13, 1.89), Vector3(1.78, 0.07, 0.32), Color(0.055, 0.06, 0.07))
+	_box(car_visual, Vector3(0, -0.17, 0), Vector3(1.96, 0.30, 4.25), car_paint)
+	_box(car_visual, Vector3(0, -0.05, -1.38), Vector3(1.89, 0.13, 1.43), car_paint.lightened(0.06))
+	_box(car_visual, Vector3(0, 0.19, 0.12), Vector3(1.61, 0.40, 1.85), Color(0.065, 0.085, 0.11))
+	_box(car_visual, Vector3(0, 0.41, 0.14), Vector3(1.48, 0.09, 1.48), car_paint)
+	_box(car_visual, Vector3(0, -0.20, -2.14), Vector3(1.67, 0.12, 0.10), Color(0.055, 0.06, 0.07))
+	_box(car_visual, Vector3(0, -0.17, 2.14), Vector3(1.76, 0.15, 0.12), Color(0.055, 0.06, 0.07))
+	_box(car_visual, Vector3(0, 0.13, 1.89), Vector3(1.78, 0.07, 0.32), Color(0.055, 0.06, 0.07))
 	for x in [-0.75, 0.75]:
-		_box(car, Vector3(x, -0.07, -2.15), Vector3(0.37, 0.10, 0.06), Color(0.95, 0.95, 0.83))
-		_box(car, Vector3(x, -0.07, 2.16), Vector3(0.40, 0.11, 0.06), Color(0.95, 0.05, 0.06))
-		_box(car, Vector3(x * 1.16, 0.11, -0.40), Vector3(0.12, 0.11, 0.26), car_paint)
+		_box(car_visual, Vector3(x, -0.07, -2.15), Vector3(0.37, 0.10, 0.06), Color(0.95, 0.95, 0.83))
+		_box(car_visual, Vector3(x, -0.07, 2.16), Vector3(0.40, 0.11, 0.06), Color(0.95, 0.05, 0.06))
+		_box(car_visual, Vector3(x * 1.16, 0.11, -0.40), Vector3(0.12, 0.11, 0.26), car_paint)
 	for x in [-0.97, 0.97]:
 		for z in [-1.40, 1.40]:
 			var pivot := Node3D.new()
 			pivot.position = Vector3(x, -0.31, z)
-			car.add_child(pivot)
+			car_visual.add_child(pivot)
 			var tire := _cylinder(pivot, Vector3.ZERO, 0.30, 0.43, Color(0.028, 0.03, 0.035))
 			tire.rotation_degrees.z = 90
 			var rim := _cylinder(pivot, Vector3(0.02 if x > 0 else -0.02, 0, 0), 0.04, 0.27, Color(0.25, 0.27, 0.29))
