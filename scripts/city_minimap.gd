@@ -1,6 +1,7 @@
 extends Control
 # Lightweight offline OpenStreetMap driving minimap (north-up).
 var road_lines: Array[PackedVector2Array] = []
+var water_zones: Array[Vector3] = []
 var car_map_position := Vector2.ZERO
 var car_heading := 0.0
 var checkpoint_position := Vector2.ZERO
@@ -17,6 +18,12 @@ func configure(data: Dictionary) -> void:
 			road_lines.append(points)
 	queue_redraw()
 
+func set_wetlands(pond_list: Array) -> void:
+	water_zones.clear()
+	for entry in pond_list:
+		water_zones.append(entry)
+	queue_redraw()
+
 func follow(car_position: Vector3, heading: float, target: Vector3, target_visible: bool) -> void:
 	car_map_position = Vector2(car_position.x, car_position.z)
 	car_heading = heading
@@ -30,6 +37,12 @@ func _map_point(world: Vector2) -> Vector2:
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.035, 0.075, 0.11, 0.92), true)
 	var extended := Rect2(-Vector2.ONE * 25.0, size + Vector2.ONE * 50.0)
+	for pond in water_zones:
+		var p := _map_point(Vector2(pond.x, pond.y))
+		var r := pond.z * meters_to_pixels
+		if p.x + r < -25.0 or p.x-r > size.x + 25.0 or p.y + r < -25.0 or p.y-r > size.y + 25.0:
+			continue
+		draw_circle(p, r, Color(0.05, 0.38, 0.50, 0.91))
 	for polyline in road_lines:
 		for i in range(polyline.size() - 1):
 			var a := _map_point(polyline[i])
