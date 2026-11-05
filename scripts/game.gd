@@ -604,6 +604,8 @@ func _start_city_mode(with_challenge: bool = true) -> void:
 	road_reset_button.visible = true
 	if city_minimap != null:
 		city_minimap.call("configure", city_map_data)
+		if wetland_world != null:
+			city_minimap.call("set_wetlands", wetland_world.get("ponds"))
 		city_minimap.visible = true
 		minimap_refresh_time = 0.0
 	_choose_mode(0)
