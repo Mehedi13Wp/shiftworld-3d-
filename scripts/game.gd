@@ -613,11 +613,84 @@ func _load_progress() -> void:
 	var data = JSON.parse_string(file.get_as_text())
 	if data is Dictionary:
 		coins = maxi(0, int(data.get("coins", 0)))
+		total_distance = maxf(0.0, float(data.get("total_distance", 0.0)))
+		last_distance_milestone = int(floor(total_distance / 250.0))
+		selected_car = clampi(int(data.get("selected_car", 0)), 0, CAR_MODELS.size() - 1)
+		owned_cars = [0]
+		var saved_owned: Array = data.get("owned_cars", [0])
+		for entry in saved_owned:
+			var id := int(entry)
+			if id > 0 and id < CAR_MODELS.size() and not owned_cars.has(id):
+				owned_cars.append(id)
+		if not owned_cars.has(selected_car):
+			selected_car = 0
 
 func _save_progress() -> void:
 	var file := FileAccess.open("user://shiftworld_progress.json", FileAccess.WRITE)
 	if file != null:
-		file.store_string(JSON.stringify({"coins": coins}))
+		file.store_string(JSON.stringify({"coins": coins, "total_distance": total_distance, "owned_cars": owned_cars, "selected_car": selected_car}))
+
+func _distance_reward(travelled: float) -> void:
+	if travelled <= 0.0 or travelled > 5.0:
+		return
+	total_distance += travelled
+	var new_milestone := int(floor(total_distance / 250.0))
+	if new_milestone <= last_distance_milestone:
+		return
+	var steps := new_milestone - last_distance_milestone
+	last_distance_milestone = new_milestone
+	var earned := steps * 50
+	coins += earned
+	coins_label.text = "COINS  %d" % coins
+	status_label.text = "+%d COINS  |  DISTANCE BONUS" % earned
+	recovery_message_time = 2.6
+	_save_progress()
+
+func _open_garage() -> void:
+	if garage_panel == null:
+		return
+	if city_mode and absf(city_velocity) > 0.6:
+		status_label.text = "STOP THE CAR TO OPEN GARAGE"
+		recovery_message_time = 2.0
+		return
+	_refresh_garage()
+	garage_panel.visible = true
+	if menu_panel != null:
+		menu_panel.visible = false
+
+func _close_garage() -> void:
+	garage_panel.visible = false
+	if not game_started:
+		menu_panel.visible = true
+
+func _refresh_garage() -> void:
+	if garage_title == null:
+		return
+	garage_title.text = "SHIFTWORLD GARAGE  |  %d COINS" % coins
+	for i in range(garage_buttons.size()):
+		var choice := garage_buttons[i]
+		if selected_car == i:
+			choice.text = "%s  |  SELECTED" % CAR_NAMES[i]
+		elif owned_cars.has(i):
+			choice.text = "%s  |  SELECT" % CAR_NAMES[i]
+		else:
+			choice.text = "%s  |  UNLOCK %d COINS" % [CAR_NAMES[i], CAR_PRICES[i]]
+
+func _choose_garage_car(index: int) -> void:
+	if index < 0 or index >= CAR_NAMES.size():
+		return
+	if not owned_cars.has(index):
+		var price := int(CAR_PRICES[index])
+		if coins < price:
+			garage_title.text = "NEED %d MORE COINS FOR %s" % [price - coins, CAR_NAMES[index]]
+			return
+		coins -= price
+		owned_cars.append(index)
+	selected_car = index
+	_apply_car_visual()
+	coins_label.text = "COINS  %d" % coins
+	_save_progress()
+	_refresh_garage()
 
 func _on_checkpoint_reached(reward: int) -> void:
 	coins += reward
@@ -908,7 +981,9 @@ func _physics_process(delta: float) -> void:
 	if hit != null:
 		city_velocity = 0.0
 		collision_flash = 1.5
-	distance += from.distance_to(car.position)
+	var travelled := from.distance_to(car.position)
+	distance += travelled
+	_distance_reward(travelled)
 	speed = absf(city_velocity)
 	if collision_flash > 0.0:
 		collision_flash -= delta
@@ -924,8 +999,9 @@ func _process(delta: float) -> void:
 	if city_mode:
 		if recovery_message_time > 0.0:
 			recovery_message_time -= delta
-			if recovery_message_time <= 0.0 and status_label.text == "BACK ON ROAD":
-				status_label.text = ""
+			if recovery_message_time <= 0.0:
+				if status_label.text == "BACK ON ROAD" or status_label.text.contains("DISTANCE BONUS") or status_label.text.contains("STOP THE CAR"):
+					status_label.text = ""
 		var behind := car.position + Vector3(sin(city_heading) * 11.5, 4.7, cos(city_heading) * 11.5)
 		camera.position = camera.position.lerp(behind, minf(delta * 4.5, 1.0))
 		camera.look_at(car.position + Vector3(0, 1.1, 0), Vector3.UP)
@@ -945,7 +1021,8 @@ func _process(delta: float) -> void:
 		if city_minimap != null and minimap_refresh_time <= 0.0:
 			city_minimap.call("follow", car.position, city_heading, map_target, map_target_visible)
 			minimap_refresh_time = 0.12
-		score_label.text = "MANHATTAN  |  %d km/h\nDISTANCE  %dm" % [int(speed * 3.6), int(distance)]
+		var remaining := maxi(1, int(ceil(float(last_distance_milestone + 1) * 250.0 - total_distance)))
+		score_label.text = "MANHATTAN  |  %d km/h\nTRIP %dm  |  +50 COINS IN %dm" % [int(speed * 3.6), int(distance), remaining]
 		return
 	var target_speed: float = [0.0, 0.0, 0.0][difficulty]
 	if accelerating:
