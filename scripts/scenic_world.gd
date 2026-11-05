@@ -154,6 +154,10 @@ func build() -> void:
 			if i%7==0:
 				_petals(pink,flower_point+Vector2(3.0*side_float,-3.8),1.1)
 				_disk(yellow,flower_point+Vector2(3.0*side_float,-3.8),0.17,WATER_Y+0.31,8)
+			if i%5==0:
+				var blossom := flower_point+Vector2(-2.0*side_float,3.0)
+				_petals(pink,blossom,0.94)
+				_disk(yellow,blossom,0.15,WATER_Y+0.31,8)
 
 	for i in range(49):
 		var z := 25.0-float(i)*20.5
