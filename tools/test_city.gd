@@ -36,6 +36,26 @@ func _run() -> void:
 	if world.get_node_or_null("StreetDetails/StreetlampPoles") == null:
 		_fail("Streetlight detail mesh missing")
 		return
+	var wetlands: Node3D = world.get_node_or_null("Wetlands") as Node3D
+	if wetlands == null:
+		_fail("Water gardens did not load")
+		return
+	for needed in ["WetlandWater", "WetlandShore", "LilyPads", "WaterSpinachVines", "PinkLotusFlowers"]:
+		var item: MeshInstance3D = wetlands.get_node_or_null(needed) as MeshInstance3D
+		if item == null or item.mesh == null:
+			_fail("Missing water or plant geometry: " + needed)
+			return
+	var pond_positions: Array = wetlands.get("ponds")
+	if pond_positions.size() < 30:
+		_fail("Expected decorative wetlands to cover vacant spaces; got " + str(pond_positions.size()))
+		return
+	if bool(wetlands.call("is_in_water", Vector3.ZERO)):
+		_fail("Times Square center was flooded")
+		return
+	var pond: Vector3 = pond_positions[0]
+	if not bool(wetlands.call("is_in_water", Vector3(pond.x, 0.67, pond.y))):
+		_fail("A visible water patch did not register as a water zone")
+		return
 	# Exercise the actual main scene and the button's city-mode startup,
 	# not only an isolated renderer.
 	var scene: PackedScene = load("res://scenes/main.tscn") as PackedScene
@@ -128,6 +148,39 @@ func _run() -> void:
 	if model == null or not is_instance_valid(model):
 		_fail("Garage did not replace car visual")
 		return
+	# A water entry costs 50; stationary frames cannot repeatedly fine.
+	var water_in_game: Node3D = game.get("wetland_world") as Node3D
+	if water_in_game == null:
+		_fail("Game did not connect water detection")
+		return
+	game.set("coins", 200)
+	game.set("car_in_water", false)
+	var pond_goal: Vector3 = pond_positions[0]
+	player.position = Vector3(pond_goal.x, 0.67, pond_goal.y)
+	game.call("_check_water_fine")
+	if int(game.get("coins")) != 150:
+		_fail("Water entry must deduct 50 coins")
+		return
+	game.call("_check_water_fine")
+	if int(game.get("coins")) != 150:
+		_fail("Remaining in the pond must not generate repeated fines")
+		return
+	player.position = Vector3.ZERO
+	game.call("_check_water_fine")
+	player.position = Vector3(pond_goal.x, 0.67, pond_goal.y)
+	game.call("_check_water_fine")
+	if int(game.get("coins")) != 100:
+		_fail("Re-entering a pond must charge one new 50-coin fine")
+		return
+	game.set("coins", 30)
+	player.position = Vector3.ZERO
+	game.call("_check_water_fine")
+	player.position = Vector3(pond_goal.x, 0.67, pond_goal.y)
+	game.call("_check_water_fine")
+	if int(game.get("coins")) != 0:
+		_fail("Water fine must never cause a negative coin balance")
+		return
+	print("SHIFTWORLD_WETLAND_TEST: PASS | ponds: ", pond_positions.size(), " | lotus + vines | fines: 50 per entry, not per frame")
 	print("SHIFTWORLD_GARAGE_TEST: PASS | 3 cars, SUV selected, 250m=50 coins, save isolated")
 	print("MANHATTAN_RENDER_TEST: PASS | windows: ", windows, " | batched meshes: ", world.get_child_count())
 	print("SHIFTWORLD_DRIVE_V4_TEST: PASS | road realism, garage, distance rewards, minimap, checkpoints: ", goals.size())
