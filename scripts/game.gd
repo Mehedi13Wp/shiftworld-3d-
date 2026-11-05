@@ -654,6 +654,8 @@ func _open_garage() -> void:
 		recovery_message_time = 2.0
 		return
 	_refresh_garage()
+	accelerating = false
+	braking = false
 	garage_panel.visible = true
 	if menu_panel != null:
 		menu_panel.visible = false
@@ -851,6 +853,9 @@ func _create_ui() -> void:
 	status_label.add_theme_color_override("font_color", Color(0.12, 1.0, 0.83))
 	ui.add_child(status_label)
 
+	garage_button = _hud_button(ui, "GARAGE", Vector2(1, 0), Vector2(-574, 15), Vector2(146, 58))
+	garage_button.add_theme_font_size_override("font_size", 22)
+	garage_button.pressed.connect(_open_garage)
 	music_button = _hud_button(ui, "MUSIC ON", Vector2(1, 0), Vector2(-420, 15), Vector2(132, 58))
 	music_button.add_theme_font_size_override("font_size", 19)
 	music_button.pressed.connect(func():
@@ -959,8 +964,52 @@ func _create_ui() -> void:
 	caption.add_theme_font_size_override("font_size", 17)
 	menu.add_child(caption)
 
+	garage_panel = PanelContainer.new()
+	garage_panel.anchor_left = 0.5
+	garage_panel.anchor_right = 0.5
+	garage_panel.anchor_top = 0.5
+	garage_panel.anchor_bottom = 0.5
+	garage_panel.offset_left = -300
+	garage_panel.offset_right = 300
+	garage_panel.offset_top = -215
+	garage_panel.offset_bottom = 215
+	var garage_style := menu_style.duplicate() as StyleBoxFlat
+	garage_panel.add_theme_stylebox_override("panel", garage_style)
+	ui.add_child(garage_panel)
+	var garage_layout := VBoxContainer.new()
+	garage_layout.add_theme_constant_override("separation", 16)
+	garage_panel.add_child(garage_layout)
+	garage_title = Label.new()
+	garage_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	garage_title.add_theme_font_size_override("font_size", 28)
+	garage_title.add_theme_color_override("font_color", Color(0.20, 0.95, 0.83))
+	garage_layout.add_child(garage_title)
+	var garage_hint := Label.new()
+	garage_hint.text = "DRIVE 250m = +50 COINS  |  UNLOCK NEW CARS"
+	garage_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	garage_hint.add_theme_font_size_override("font_size", 18)
+	garage_layout.add_child(garage_hint)
+	for i in range(CAR_NAMES.size()):
+		var option := Button.new()
+		option.custom_minimum_size = Vector2(520, 62)
+		option.add_theme_font_size_override("font_size", 22)
+		option.pressed.connect(_choose_garage_car.bind(i))
+		garage_layout.add_child(option)
+		garage_buttons.append(option)
+	var close_button := Button.new()
+	close_button.text = "BACK  /  DRIVE"
+	close_button.custom_minimum_size = Vector2(520, 64)
+	close_button.add_theme_font_size_override("font_size", 23)
+	garage_layout.add_child(close_button)
+	close_button.pressed.connect(_close_garage)
+	_refresh_garage()
+	garage_panel.visible = false
+
 func _physics_process(delta: float) -> void:
 	if not city_mode or not game_started or crashed:
+		return
+	if garage_panel != null and garage_panel.visible:
+		city_velocity = 0.0
 		return
 	var desired := 0.0
 	if accelerating and not braking:
