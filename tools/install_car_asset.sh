@@ -47,6 +47,8 @@ echo "Importing actual car and tree meshes..."
 godot --headless --editor --path . --import
 echo "Testing Manhattan scene + checkpoint gameplay..."
 godot --headless --path . --script res://tools/test_city.gd
+echo "Testing selected Scenic Water Garden route..."
+godot --headless --path . --script res://tools/test_scenic.gd
 echo "Building Android..."
 godot --headless --path . --export-debug "Android" build/SHIFTWORLD-DEV.apk
 test -s build/SHIFTWORLD-DEV.apk
