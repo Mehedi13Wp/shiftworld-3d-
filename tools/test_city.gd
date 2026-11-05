@@ -40,7 +40,7 @@ func _run() -> void:
 	if wetlands == null:
 		_fail("Water gardens did not load")
 		return
-	for needed in ["WetlandWater", "WetlandShore", "LilyPads", "WaterSpinachVines", "PinkLotusFlowers"]:
+	for needed in ["WetlandWater", "WetlandShore", "LilyPads", "WaterSpinachVines", "PinkLotusFlowers", "WetlandReeds"]:
 		var item: MeshInstance3D = wetlands.get_node_or_null(needed) as MeshInstance3D
 		if item == null or item.mesh == null:
 			_fail("Missing water or plant geometry: " + needed)
@@ -52,6 +52,14 @@ func _run() -> void:
 	if bool(wetlands.call("is_in_water", Vector3.ZERO)):
 		_fail("Times Square center was flooded")
 		return
+	# Any road centerline must remain dry, including intersections.
+	var map_file := FileAccess.open("res://data/cities/manhattan.json", FileAccess.READ)
+	var data = JSON.parse_string(map_file.get_as_text())
+	for road in data.get("roads", []):
+		for p in road.get("points", []):
+			if bool(wetlands.call("is_in_water", Vector3(float(p[0]), 0.67, float(p[1])))):
+				_fail("Wetland water overlaps the mapped road centerline")
+				return
 	var pond: Vector3 = pond_positions[0]
 	if not bool(wetlands.call("is_in_water", Vector3(pond.x, 0.67, pond.y))):
 		_fail("A visible water patch did not register as a water zone")
