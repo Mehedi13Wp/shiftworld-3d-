@@ -31,6 +31,7 @@ var selected_car := 0
 var owned_cars: Array[int] = [0]
 var total_distance := 0.0
 var last_distance_milestone := 0
+var test_no_save := false
 var coins := 0
 var city_velocity := 0.0
 var reverse_gear := false
@@ -626,6 +627,8 @@ func _load_progress() -> void:
 			selected_car = 0
 
 func _save_progress() -> void:
+	if test_no_save:
+		return
 	var file := FileAccess.open("user://shiftworld_progress.json", FileAccess.WRITE)
 	if file != null:
 		file.store_string(JSON.stringify({"coins": coins, "total_distance": total_distance, "owned_cars": owned_cars, "selected_car": selected_car}))
