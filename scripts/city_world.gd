@@ -19,7 +19,24 @@ func _mat(color: Color) -> StandardMaterial3D:
 	return m
 
 func _setup_materials() -> void:
-	road_material = _mat(Color(0.15, 0.17, 0.19))
+	road_material = _mat(Color(0.82, 0.84, 0.87))
+	var asphalt_noise := FastNoiseLite.new()
+	asphalt_noise.seed = 53109
+	asphalt_noise.frequency = 0.09
+	asphalt_noise.fractal_octaves = 3
+	var asphalt_texture := NoiseTexture2D.new()
+	asphalt_texture.width = 256
+	asphalt_texture.height = 256
+	asphalt_texture.seamless = true
+	asphalt_texture.noise = asphalt_noise
+	var tones := Gradient.new()
+	tones.set_color(0, Color(0.095, 0.105, 0.115))
+	tones.set_color(1, Color(0.235, 0.245, 0.255))
+	asphalt_texture.color_ramp = tones
+	road_material.albedo_texture = asphalt_texture
+	road_material.uv1_triplanar = true
+	road_material.uv1_scale = Vector3(0.12, 0.12, 0.12)
+	road_material.roughness = 0.97
 	sidewalk_material = _mat(Color(0.52, 0.53, 0.52))
 	lane_material = _mat(Color(0.92, 0.89, 0.72))
 	roof_material = _mat(Color(0.38, 0.40, 0.43))
@@ -83,6 +100,10 @@ func load_city(city_id: String) -> bool:
 	roofs.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var glass := SurfaceTool.new()
 	glass.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var storefront := SurfaceTool.new()
+	storefront.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var shop_signs := SurfaceTool.new()
+	shop_signs.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var collision_walls := SurfaceTool.new()
 	collision_walls.begin(Mesh.PRIMITIVE_TRIANGLES)
 	window_count = 0
@@ -103,7 +124,7 @@ func load_city(city_id: String) -> bool:
 	)
 	var count := 0
 	for building in buildings:
-		if _add_building(walls, roofs, glass, collision_walls, building):
+		if _add_building(walls, roofs, glass, storefront, shop_signs, collision_walls, building):
 			count += 1
 			if count >= 650:
 				break
@@ -111,6 +132,8 @@ func load_city(city_id: String) -> bool:
 		_commit(walls[i], wall_materials[i], "BuildingWalls" + str(i))
 	_commit(roofs, roof_material, "Roofs")
 	_commit(glass, glass_material, "FacadeWindows")
+	_commit(storefront, _mat(Color(0.075, 0.16, 0.20)), "GroundFloorShopWindows")
+	_commit(shop_signs, _mat(Color(0.23, 0.36, 0.43)), "StorefrontSignBands")
 	var details_script := load("res://scripts/city_decor.gd") as Script
 	if details_script != null:
 		var details := Node3D.new()
@@ -244,7 +267,7 @@ func _add_facade_windows(glass: SurfaceTool, a: Vector2, b: Vector2, height: flo
 			_quad(glass, Vector3(left.x,bottom,left.y), Vector3(right.x,bottom,right.y), Vector3(right.x,top,right.y), Vector3(left.x,top,left.y))
 			window_count += 1
 
-func _add_building(walls: Array[SurfaceTool], roofs: SurfaceTool, glass: SurfaceTool, collision_walls: SurfaceTool, building: Dictionary) -> bool:
+func _add_building(walls: Array[SurfaceTool], roofs: SurfaceTool, glass: SurfaceTool, storefront: SurfaceTool, shop_signs: SurfaceTool, collision_walls: SurfaceTool, building: Dictionary) -> bool:
 	var raw: Array = building.get("points", [])
 	if raw.size() < 4:
 		return false
@@ -279,6 +302,7 @@ func _add_building(walls: Array[SurfaceTool], roofs: SurfaceTool, glass: Surface
 	var building_center := Vector2((min_x + max_x) * 0.5, (min_z + max_z) * 0.5)
 	var show_windows := building_center.length_squared() < 550.0 * 550.0
 	var needs_collision := building_center.length_squared() < 320.0 * 320.0
+	var needs_stores := building_center.length_squared() < 260.0 * 260.0
 	var distance_to_center := building_center.length()
 	var window_budget := 60 if distance_to_center < 200.0 else (40 if distance_to_center < 350.0 else 20)
 	var per_wall_budget := maxi(1, int(ceil(float(window_budget) / float(outline.size()))))
@@ -290,6 +314,18 @@ func _add_building(walls: Array[SurfaceTool], roofs: SurfaceTool, glass: Surface
 			_quad(collision_walls, Vector3(a.x,0,a.y), Vector3(b.x,0,b.y), Vector3(b.x,height,b.y), Vector3(a.x,height,a.y))
 		if show_windows:
 			_add_facade_windows(glass, a, b, height, facade_area, per_wall_budget)
+		if needs_stores and height >= 6.0:
+			var edge := b - a
+			var edge_length := edge.length()
+			if edge_length > 7.5:
+				var direction := edge / edge_length
+				var facing := Vector2(direction.y, -direction.x) * (1.0 if facade_area > 0.0 else -1.0)
+				var center := (a + b) * 0.5 + facing * 0.09
+				var span := minf(edge_length - 1.5, 17.0)
+				var left := center - direction * span * 0.5
+				var right := center + direction * span * 0.5
+				_quad(storefront, Vector3(left.x, 0.55, left.y), Vector3(right.x, 0.55, right.y), Vector3(right.x, 2.9, right.y), Vector3(left.x, 2.9, left.y))
+				_quad(shop_signs, Vector3(left.x, 3.0, left.y), Vector3(right.x, 3.0, right.y), Vector3(right.x, 3.55, right.y), Vector3(left.x, 3.55, left.y))
 	for i in range(0,indices.size(),3):
 		var a := outline[indices[i]]
 		var b := outline[indices[i+1]]
